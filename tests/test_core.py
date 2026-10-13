@@ -113,3 +113,84 @@ def test_style_warnings():
     assert style_warnings(QRStyle(fg="#888888", bg="#999999"))
     assert style_warnings(QRStyle(logo=str(DEFAULT_LOGO), logo_ratio=0.3))
     assert not style_warnings(QRStyle())
+
+
+# ---------- v0.2: formas, ojos, tamaño exacto, UTM, atajo, ajustes ----------
+import json
+import xml.dom.minidom as md
+
+from anyelo_qr.core import EYE_SHAPES, SHAPES, build_utm
+from anyelo_qr.hotkey import MOD_ALT, MOD_CONTROL, parse_hotkey
+from anyelo_qr.settings import Settings
+
+
+@pytest.mark.parametrize("shape", list(SHAPES))
+@pytest.mark.parametrize("eye", list(EYE_SHAPES))
+def test_every_shape_and_eye_reads_back(shape, eye):
+    st = QRStyle(shape=shape, eye_shape=eye, eye_color="#1B2A6B")
+    assert verify(render_png(URL, st), URL)
+
+
+@pytest.mark.parametrize("shape", list(SHAPES))
+@pytest.mark.parametrize("logo", [None, str(DEFAULT_LOGO)])
+@pytest.mark.parametrize("border", [True, False])
+def test_svg_valid_for_every_style(shape, logo, border):
+    svg = render_svg(URL, QRStyle(shape=shape, eye_shape="circle", logo=logo, logo_border=border))
+    md.parseString(svg)
+
+
+@pytest.mark.parametrize("px", [100, 333, 640, 1000, 2048])
+def test_exact_pixel_size(px):
+    img = render_png(URL, QRStyle(size=px))
+    assert img.size == (px, px)
+
+
+def test_size_is_clamped():
+    assert render_png("x", QRStyle(size=10)).size == (100, 100)
+
+
+def test_logo_border_options_read_back():
+    for border in (True, False):
+        for fg, bg in (("#000000", "#FFFFFF"), ("#FFFFFF", "#111111")):
+            st = QRStyle(fg=fg, bg=bg, logo=str(DEFAULT_LOGO), logo_border=border)
+            assert verify(render_png(URL, st), URL)
+
+
+def test_pdf_is_big_enough_for_print(tmp_path):
+    files = save_qr(URL, tmp_path / "p", ["pdf"], QRStyle(size=300, shape="dots"))
+    assert files[0].stat().st_size > 0
+    found, errs = read_paths([files[0]])
+    assert not errs and {f.text for f in found} == {URL}
+
+
+def test_utm_builder():
+    assert build_utm("anyelostyle.com/promo", "Instagram", "Social", "Otoño 2026") == \
+        "https://anyelostyle.com/promo?utm_source=instagram&utm_medium=social&utm_campaign=otono-2026"
+    # conserva parámetros propios y reemplaza UTM viejos
+    out = build_utm("https://a.com/x?ref=1&utm_source=viejo#top", "ig", lower=False)
+    assert out == "https://a.com/x?ref=1&utm_source=ig#top"
+    with pytest.raises(ValueError):
+        build_utm("", "ig")
+    with pytest.raises(ValueError):
+        build_utm("a.com", "  ")
+
+
+def test_hotkey_parse():
+    assert parse_hotkey("Ctrl+Alt+Q") == (MOD_CONTROL | MOD_ALT, ord("Q"))
+    assert parse_hotkey("Ctrl+Shift+F9")[1] == 0x78
+    for bad in ("Q", "Shift+Q", "Ctrl+Alt", "Ctrl+Q+W", "Ctrl+Alt+Ñ"):
+        with pytest.raises(ValueError):
+            parse_hotkey(bad)
+
+
+def test_settings_migration_and_defaults(tmp_path, monkeypatch):
+    monkeypatch.setenv("APPDATA", str(tmp_path))
+    assert Settings().logo_mode == "none" and Settings().open_after is True
+    path = tmp_path / "AnyeloStyleQR" / "settings.json"
+    path.parent.mkdir(parents=True)
+    path.write_text(json.dumps({"logo_mode": "default", "scale": 12, "fg": "#112233"}))   # formato de la v0.1
+    s = Settings.load()
+    assert s.logo_mode == "none" and s.fg == "#112233" and s.schema == 2
+    s.logo_mode = "default"
+    s.save()
+    assert Settings.load().logo_mode == "default"      # ya migrado: respeta su elección

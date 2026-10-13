@@ -7,6 +7,8 @@ from pathlib import Path
 
 from .brand import DEFAULT_BG, DEFAULT_FG
 
+SCHEMA = 2
+
 
 def settings_path() -> Path:
     base = os.environ.get("APPDATA")
@@ -16,26 +18,44 @@ def settings_path() -> Path:
 
 @dataclass
 class Settings:
+    schema: int = SCHEMA
+    # destino
     out_dir: str = ""
+    fmts: list[str] = field(default_factory=lambda: ["png", "svg"])
+    open_after: bool = True
+    # estilo del QR
     fg: str = DEFAULT_FG
     bg: str = DEFAULT_BG
-    scale: int = 12
+    qr_px: int = 1000
     error: str = "m"
-    logo_mode: str = "default"      # default | none | custom
+    shape: str = "square"
+    eye_shape: str = "square"
+    eye_color_on: bool = False
+    eye_color: str = "#000000"
+    logo_mode: str = "none"         # none | default | custom
     logo_custom: str = ""
     logo_ratio: float = 0.22
-    fmts: list[str] = field(default_factory=lambda: ["png", "svg"])
+    logo_border: bool = True
+    # opciones de generación
     add_https: bool = True
     skip_dupes: bool = True
     verify: bool = True
     overwrite: bool = False
+    # atajo global
+    hotkey_enabled: bool = True
+    hotkey: str = "Ctrl+Alt+Q"
+    keep_running: bool = True
 
     @classmethod
     def load(cls) -> "Settings":
         try:
             data = json.loads(settings_path().read_text(encoding="utf-8"))
             known = {f.name for f in fields(cls)}
-            return cls(**{k: v for k, v in data.items() if k in known})
+            s = cls(**{k: v for k, v in data.items() if k in known})
+            if data.get("schema", 1) < 2:      # la v0.1 traía el logo activado por defecto
+                s.logo_mode = "none"
+            s.schema = SCHEMA
+            return s
         except Exception:
             return cls()
 

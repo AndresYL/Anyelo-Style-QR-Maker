@@ -3,183 +3,31 @@ from __future__ import annotations
 
 import csv
 import io
-import os
 import sys
+import tempfile
+from dataclasses import replace
 from pathlib import Path
 
-from PySide6.QtCore import QThread, QTimer, Qt, QUrl, Signal
-from PySide6.QtGui import QColor, QDesktopServices, QGuiApplication, QIcon, QPixmap
+from PySide6.QtCore import QLockFile, Qt, QTimer, QUrl, Signal
+from PySide6.QtGui import QAction, QColor, QDesktopServices, QGuiApplication, QIcon, QPixmap
 from PySide6.QtWidgets import (
-    QApplication, QCheckBox, QScrollArea, QColorDialog, QComboBox, QFileDialog, QFrame, QHBoxLayout, QHeaderView,
-    QLabel, QLineEdit, QMainWindow, QMessageBox, QPlainTextEdit, QProgressBar, QPushButton, QSlider,
-    QTableWidget, QTableWidgetItem, QTabWidget, QVBoxLayout, QWidget,
+    QApplication, QCheckBox, QComboBox, QFileDialog, QFrame, QHBoxLayout, QHeaderView, QKeySequenceEdit, QLabel,
+    QLineEdit, QMainWindow, QMenu, QMessageBox, QPlainTextEdit, QProgressBar, QPushButton, QScrollArea, QSlider,
+    QSpinBox, QSystemTrayIcon, QTableWidget, QTableWidgetItem, QTabWidget, QVBoxLayout, QWidget,
 )
 
 from . import brand
-from .core import ERROR_LEVELS, Item, QRStyle, generate_batch, parse_lines, render_png, style_warnings
+from .core import (ERROR_LEVELS, EYE_SHAPES, MAX_PX, MIN_PX, SHAPES, Item, QRStyle, build_utm, generate_batch,
+                   parse_lines, render_png, safe_filename, style_warnings, verify)
+from .hotkey import GlobalHotkey
 from .paths import DEFAULT_LOGO, asset
 from .reader import is_url, read_paths
+from .scanner import Scanner
 from .settings import Settings
 from .tabular import guess_columns, items_from_table, read_table, sheet_names
-
-QSS = f"""
-* {{ font-family: "Segoe UI", "Inter", sans-serif; font-size: 13px; color: {brand.TEXT}; }}
-QMainWindow, QWidget#root {{ background: {brand.BG}; }}
-QTabWidget::pane {{ border: 1px solid {brand.BORDER}; border-radius: 10px; background: {brand.PANEL}; top: -1px; }}
-QTabBar::tab {{ background: transparent; color: {brand.MUTED}; padding: 9px 18px; margin-right: 2px; border: none; font-weight: 600; }}
-QTabBar::tab:selected {{ color: {brand.TEXT}; border-bottom: 2px solid {brand.ACCENT}; }}
-QFrame#panel {{ background: {brand.PANEL}; border: 1px solid {brand.BORDER}; border-radius: 10px; }}
-QLabel#muted {{ color: {brand.MUTED}; }}
-QLabel#h1 {{ font-size: 20px; font-weight: 700; }}
-QLabel#h2 {{ font-size: 12px; font-weight: 700; color: {brand.MUTED}; letter-spacing: 1px; }}
-QPlainTextEdit, QLineEdit, QComboBox, QTableWidget {{
-    background: {brand.PANEL_2}; border: 1px solid {brand.BORDER}; border-radius: 8px; padding: 6px; selection-background-color: #3A3D41; }}
-QComboBox QAbstractItemView {{ background: {brand.PANEL_2}; selection-background-color: #3A3D41; }}
-QHeaderView::section {{ background: {brand.PANEL}; color: {brand.MUTED}; border: none; padding: 6px; font-weight: 600; }}
-QTableWidget {{ gridline-color: {brand.BORDER}; }}
-QPushButton {{ background: {brand.PANEL_2}; border: 1px solid {brand.BORDER}; border-radius: 8px; padding: 8px 14px; font-weight: 600; }}
-QPushButton:hover {{ border-color: {brand.MUTED}; }}
-QPushButton:disabled {{ color: #5A5E63; }}
-QPushButton#primary {{ background: {brand.ACCENT}; color: {brand.ACCENT_TEXT}; border: none; }}
-QPushButton#primary:hover {{ background: #E4E4E4; }}
-QPushButton#primary:disabled {{ background: #3A3D41; color: #7A7E83; }}
-QCheckBox::indicator {{ width: 16px; height: 16px; border-radius: 4px; border: 1px solid {brand.MUTED}; background: {brand.PANEL_2}; }}
-QCheckBox::indicator:checked {{ background: {brand.ACCENT}; border-color: {brand.ACCENT}; image: url({asset("check.png").as_posix()}); }}
-QScrollArea {{ background: transparent; border: none; }}
-QScrollBar:vertical {{ background: transparent; width: 8px; margin: 2px; }}
-QScrollBar::handle:vertical {{ background: {brand.BORDER}; border-radius: 4px; min-height: 30px; }}
-QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{ height: 0; }}
-QSlider::groove:horizontal {{ height: 4px; background: {brand.BORDER}; border-radius: 2px; }}
-QSlider::handle:horizontal {{ background: {brand.ACCENT}; width: 14px; margin: -6px 0; border-radius: 7px; }}
-QProgressBar {{ background: {brand.PANEL_2}; border: none; border-radius: 4px; height: 8px; text-align: center; color: transparent; }}
-QProgressBar::chunk {{ background: {brand.ACCENT}; border-radius: 4px; }}
-QLabel#drop {{ border: 2px dashed {brand.BORDER}; border-radius: 12px; color: {brand.MUTED}; padding: 26px; }}
-QLabel#drop[hover="true"] {{ border-color: {brand.ACCENT}; color: {brand.TEXT}; }}
-"""
-
-STATUS_COLOR = {"ok": brand.OK, "aviso": brand.WARN, "error": brand.DANGER, "omitido": brand.MUTED}
-STATUS_TEXT = {"ok": "Listo", "aviso": "Revisar", "error": "Error", "omitido": "Omitido"}
-
-
-# ---------- utilidades ----------
-
-class Job(QThread):
-    progress = Signal(int, int)
-    done = Signal(object)
-    failed = Signal(str)
-
-    def __init__(self, fn):
-        super().__init__()
-        self.fn = fn
-
-    def run(self):
-        try:
-            self.done.emit(self.fn(lambda i, n: self.progress.emit(i, n)))
-        except Exception as exc:
-            self.failed.emit(str(exc))
-
-
-def pil_to_pixmap(img, size: int) -> QPixmap:
-    buf = io.BytesIO()
-    img.convert("RGBA").save(buf, "PNG")
-    pm = QPixmap()
-    pm.loadFromData(buf.getvalue())
-    return pm.scaled(size, size, Qt.KeepAspectRatio, Qt.SmoothTransformation)
-
-
-def h2(text: str) -> QLabel:
-    lb = QLabel(text.upper())
-    lb.setObjectName("h2")
-    return lb
-
-
-def muted(text: str) -> QLabel:
-    lb = QLabel(text)
-    lb.setObjectName("muted")
-    lb.setWordWrap(True)
-    return lb
-
-
-def open_folder(path: str):
-    if path and Path(path).exists():
-        QDesktopServices.openUrl(QUrl.fromLocalFile(path))
-
-
-class DropZone(QLabel):
-    dropped = Signal(list)
-
-    def __init__(self, text: str):
-        super().__init__(text)
-        self.setObjectName("drop")
-        self.setAlignment(Qt.AlignCenter)
-        self.setAcceptDrops(True)
-        self.setWordWrap(True)
-
-    def _hover(self, on: bool):
-        self.setProperty("hover", on)
-        self.style().unpolish(self)
-        self.style().polish(self)
-
-    def dragEnterEvent(self, e):
-        if e.mimeData().hasUrls():
-            e.acceptProposedAction()
-            self._hover(True)
-
-    def dragLeaveEvent(self, e):
-        self._hover(False)
-
-    def dropEvent(self, e):
-        self._hover(False)
-        self.dropped.emit([u.toLocalFile() for u in e.mimeData().urls() if u.isLocalFile()])
-
-
-class ColorButton(QPushButton):
-    changed = Signal(str)
-
-    def __init__(self, color: str):
-        super().__init__()
-        self.color = color
-        self.setFixedSize(44, 30)
-        self._paint()
-        self.clicked.connect(self._pick)
-
-    def _paint(self):
-        self.setStyleSheet(f"background:{self.color}; border:1px solid {brand.MUTED}; border-radius:6px;")
-
-    def set_color(self, c: str):
-        self.color = c
-        self._paint()
-
-    def _pick(self):
-        c = QColorDialog.getColor(QColor(self.color), self, "Elegir color")
-        if c.isValid():
-            self.set_color(c.name().upper())
-            self.changed.emit(self.color)
-
-
-class ResultsTable(QTableWidget):
-    def __init__(self):
-        super().__init__(0, 3)
-        self.setHorizontalHeaderLabels(["Archivo", "Estado", "Detalle"])
-        self.verticalHeader().setVisible(False)
-        self.setEditTriggers(QTableWidget.NoEditTriggers)
-        self.setSelectionBehavior(QTableWidget.SelectRows)
-        h = self.horizontalHeader()
-        h.setSectionResizeMode(0, QHeaderView.ResizeToContents)
-        h.setSectionResizeMode(1, QHeaderView.ResizeToContents)
-        h.setSectionResizeMode(2, QHeaderView.Stretch)
-
-    def show_rows(self, rows):
-        self.setRowCount(0)
-        for r in rows:
-            i = self.rowCount()
-            self.insertRow(i)
-            detail = r.note or (", ".join(f.suffix.lstrip(".") for f in r.files) if r.files else "")
-            for col, txt in enumerate([r.name, STATUS_TEXT[r.status], detail]):
-                it = QTableWidgetItem(txt)
-                if col == 1:
-                    it.setForeground(QColor(STATUS_COLOR[r.status]))
-                self.setItem(i, col, it)
+from .theme import build_qss
+from .widgets import (ColorButton, DestinationCard, DropZone, Job, ResultsTable, StepCard, h2, muted, open_folder,
+                      pil_to_pixmap, pil_to_qimage, scrolled)
 
 
 # ---------- panel de estilo (derecha) ----------
@@ -198,18 +46,19 @@ class StylePanel(QFrame):
         v.setSpacing(6)
 
         self.preview = QLabel(alignment=Qt.AlignCenter)
-        self.preview.setMinimumHeight(216)
-        self.preview.setMaximumHeight(216)
+        self.preview.setFixedHeight(216)
         v.addWidget(self.preview)
+        self.badge = QLabel(alignment=Qt.AlignCenter)
+        v.addWidget(self.badge)
         self.warn = QLabel()
+        self.warn.setObjectName("warn")
         self.warn.setWordWrap(True)
-        self.warn.setStyleSheet(f"color:{brand.WARN};")
         v.addWidget(self.warn)
 
         v.addWidget(h2("Colores"))
         row = QHBoxLayout()
-        self.fg = ColorButton(s.fg)
-        self.bg = ColorButton(s.bg)
+        self.fg = ColorButton(s.fg, "Color del código", lambda c: self._preview_with(fg=c))
+        self.bg = ColorButton(s.bg, "Color del fondo", lambda c: self._preview_with(bg=c))
         row.addWidget(QLabel("Código"))
         row.addWidget(self.fg)
         row.addSpacing(10)
@@ -218,10 +67,29 @@ class StylePanel(QFrame):
         row.addStretch()
         v.addLayout(row)
 
+        v.addWidget(h2("Forma"))
+        self.shape = QComboBox()
+        for k, label in SHAPES.items():
+            self.shape.addItem("Cuadritos: " + label.lower(), k)
+        self.shape.setCurrentIndex(max(0, self.shape.findData(s.shape)))
+        self.eye = QComboBox()
+        for k, label in EYE_SHAPES.items():
+            self.eye.addItem("Ojos: " + label.lower(), k)
+        self.eye.setCurrentIndex(max(0, self.eye.findData(s.eye_shape)))
+        v.addWidget(self.shape)
+        v.addWidget(self.eye)
+        er = QHBoxLayout()
+        self.eye_on = QCheckBox("Color propio en los ojos")
+        self.eye_on.setChecked(s.eye_color_on)
+        self.eye_btn = ColorButton(s.eye_color, "Color de los ojos", lambda c: self._preview_with(eye_color=c))
+        er.addWidget(self.eye_on, 1)
+        er.addWidget(self.eye_btn)
+        v.addLayout(er)
+
         v.addWidget(h2("Logo en el centro"))
         self.logo = QComboBox()
-        self.logo.addItems(["Anyelo Style", "Sin logo", "Otro logo…"])
-        self.logo.setCurrentIndex({"default": 0, "none": 1, "custom": 2}[s.logo_mode])
+        self.logo.addItems(["Sin logo", "Anyelo Style", "Otro logo…"])
+        self.logo.setCurrentIndex({"none": 0, "default": 1, "custom": 2}[s.logo_mode])
         v.addWidget(self.logo)
         self.logo_path = muted(Path(s.logo_custom).name if s.logo_custom else "")
         v.addWidget(self.logo_path)
@@ -232,91 +100,61 @@ class StylePanel(QFrame):
         self.ratio.setValue(int(s.logo_ratio * 100))
         r2.addWidget(self.ratio)
         v.addLayout(r2)
+        self.logo_border = QCheckBox("Con borde")
+        self.logo_border.setChecked(s.logo_border)
+        v.addWidget(self.logo_border)
 
-        v.addWidget(h2("Calidad"))
+        v.addWidget(h2("Tamaño y calidad"))
         r3 = QHBoxLayout()
-        self.size = QComboBox()
-        self.size.addItem("Pequeño", 8)
-        self.size.addItem("Mediano", 12)
-        self.size.addItem("Grande", 20)
-        self.size.addItem("Muy grande", 32)
-        self.size.setCurrentIndex(max(0, self.size.findData(s.scale)))
+        self.px = QSpinBox()
+        self.px.setRange(MIN_PX, MAX_PX)
+        self.px.setSuffix(" px")
+        self.px.setValue(s.qr_px)
+        self.px.setKeyboardTracking(False)
+        r3.addWidget(QLabel("Lado:"))
+        r3.addWidget(self.px, 1)
+        v.addLayout(r3)
         self.err = QComboBox()
         for k, label in ERROR_LEVELS.items():
-            self.err.addItem(label, k)
+            self.err.addItem("Corrección: " + label, k)
         self.err.setCurrentIndex(max(0, self.err.findData(s.error)))
-        r3.addWidget(self.size)
-        r3.addWidget(self.err)
-        v.addLayout(r3)
-        v.addWidget(muted("Con logo, la corrección sube sola a Máxima."))
-
-        v.addWidget(h2("Guardar como"))
-        r4 = QHBoxLayout()
-        self.fmt = {f: QCheckBox(f.upper()) for f in ("png", "svg", "pdf")}
-        for f, cb in self.fmt.items():
-            cb.setChecked(f in s.fmts)
-            r4.addWidget(cb)
-        r4.addStretch()
-        v.addLayout(r4)
-
-        v.addWidget(h2("Carpeta de destino"))
-        r5 = QHBoxLayout()
-        self.folder = QLineEdit(s.out_dir)
-        self.folder.setPlaceholderText("Elige una carpeta…")
-        pick = QPushButton("…")
-        pick.setFixedWidth(40)
-        pick.setStyleSheet("padding: 8px 0;")
-        pick.clicked.connect(self._pick_folder)
-        r5.addWidget(self.folder)
-        r5.addWidget(pick)
-        v.addLayout(r5)
-
-        self.opt_https = QCheckBox("Agregar https:// si falta")
-        self.opt_dupes = QCheckBox("Omitir links repetidos")
-        self.opt_verify = QCheckBox("Leer de vuelta cada QR creado")
-        self.opt_over = QCheckBox("Reemplazar archivos existentes")
-        for cb, val in ((self.opt_https, s.add_https), (self.opt_dupes, s.skip_dupes),
-                        (self.opt_verify, s.verify), (self.opt_over, s.overwrite)):
-            cb.setChecked(val)
-            v.addWidget(cb)
+        v.addWidget(self.err)
+        v.addWidget(muted("Con logo, la corrección sube sola a Máxima. El QR siempre es cuadrado."))
         v.addStretch()
 
-        for w in (self.fg, self.bg):
+        for w in (self.fg, self.bg, self.eye_btn):
             w.changed.connect(self._on_change)
+            w.live.connect(lambda _c: self.refresh())
         self.logo.currentIndexChanged.connect(self._on_logo)
         self.ratio.valueChanged.connect(self._on_change)
-        for w in (self.size, self.err):
+        for w in (self.shape, self.eye, self.err):
             w.currentIndexChanged.connect(self._on_change)
-        for cb in [*self.fmt.values(), self.opt_https, self.opt_dupes, self.opt_verify, self.opt_over]:
+        self.px.valueChanged.connect(self._on_change)
+        for cb in (self.eye_on, self.logo_border):
             cb.toggled.connect(self._on_change)
-        self.folder.textChanged.connect(self._on_change)
         self.refresh()
 
-    # --- lectura del estado ---
+    # --- estado ---
     def logo_file(self) -> str | None:
         i = self.logo.currentIndex()
-        if i == 0:
+        if i == 1:
             return str(DEFAULT_LOGO)
         if i == 2 and self.s.logo_custom and Path(self.s.logo_custom).exists():
             return self.s.logo_custom
         return None
 
     def style(self) -> QRStyle:
-        return QRStyle(fg=self.fg.color, bg=self.bg.color, scale=self.size.currentData(),
-                       error=self.err.currentData(), logo=self.logo_file(), logo_ratio=self.ratio.value() / 100)
+        return QRStyle(
+            fg=self.fg.color, bg=self.bg.color, size=self.px.value(), error=self.err.currentData(),
+            shape=self.shape.currentData(), eye_shape=self.eye.currentData(),
+            eye_color=self.eye_btn.color if self.eye_on.isChecked() else None,
+            logo=self.logo_file(), logo_ratio=self.ratio.value() / 100, logo_border=self.logo_border.isChecked())
 
-    def fmts(self) -> list[str]:
-        return [f for f, cb in self.fmt.items() if cb.isChecked()]
-
-    def out_dir(self) -> str:
-        return self.folder.text().strip()
+    def _preview_with(self, **changes):
+        st = replace(self.style(), size=600, **changes)
+        return render_png(self.sample, st)
 
     # --- acciones ---
-    def _pick_folder(self):
-        d = QFileDialog.getExistingDirectory(self, "Carpeta de destino", self.out_dir() or str(Path.home()))
-        if d:
-            self.folder.setText(d)
-
     def _on_logo(self):
         if self.logo.currentIndex() == 2:
             f, _ = QFileDialog.getOpenFileName(self, "Elegir logo", "", "Imágenes (*.png *.jpg *.jpeg *.webp)")
@@ -332,13 +170,12 @@ class StylePanel(QFrame):
     def _on_change(self, *_):
         s = self.s
         s.fg, s.bg = self.fg.color, self.bg.color
-        s.scale, s.error = self.size.currentData(), self.err.currentData()
-        s.logo_mode = ["default", "none", "custom"][self.logo.currentIndex()]
+        s.qr_px, s.error = self.px.value(), self.err.currentData()
+        s.shape, s.eye_shape = self.shape.currentData(), self.eye.currentData()
+        s.eye_color_on, s.eye_color = self.eye_on.isChecked(), self.eye_btn.color
+        s.logo_mode = ["none", "default", "custom"][self.logo.currentIndex()]
         s.logo_ratio = self.ratio.value() / 100
-        s.fmts = self.fmts()
-        s.out_dir = self.out_dir()
-        s.add_https, s.skip_dupes = self.opt_https.isChecked(), self.opt_dupes.isChecked()
-        s.verify, s.overwrite = self.opt_verify.isChecked(), self.opt_over.isChecked()
+        s.logo_border = self.logo_border.isChecked()
         s.save()
         self.refresh()
         self.changed.emit()
@@ -349,11 +186,24 @@ class StylePanel(QFrame):
 
     def refresh(self):
         st = self.style()
+        has_logo = st.logo is not None
+        self.ratio.setEnabled(has_logo)
+        self.logo_border.setEnabled(has_logo)
         try:
-            self.preview.setPixmap(pil_to_pixmap(render_png(self.sample, st), 210))
+            img = render_png(self.sample, replace(st, size=min(st.px, 800)))
+            self.preview.setPixmap(pil_to_pixmap(img, 210))
+            if verify(img, self.sample):
+                self.badge.setText("✓ Se lee bien")
+                self.badge.setObjectName("good")
+            else:
+                self.badge.setText("⚠ No se pudo leer de vuelta")
+                self.badge.setObjectName("bad")
         except Exception:
-            self.preview.setText("Texto demasiado largo para esta vista previa")
-        self.warn.setText("\n".join(style_warnings(st)))
+            self.preview.setText("Texto demasiado largo\npara este nivel de corrección")
+            self.badge.setText("")
+        self.badge.style().unpolish(self.badge)
+        self.badge.style().polish(self.badge)
+        self.warn.setText("\n".join(style_warnings(st, self.sample)))
 
 
 # ---------- pestañas ----------
@@ -362,39 +212,65 @@ class GenerateTab(QWidget):
     def __init__(self, win: "MainWindow"):
         super().__init__()
         self.win = win
-        v = QVBoxLayout(self)
-        v.setContentsMargins(16, 16, 16, 16)
-        v.addWidget(muted("Un link por línea. Si quieres ponerle nombre al archivo, escribe «Nombre | link». "
-                          "También puedes pegar dos columnas desde Excel."))
+        page = QWidget()
+        v = QVBoxLayout(page)
+        v.setContentsMargins(2, 8, 10, 8)
+        v.setSpacing(12)
+
+        c1 = StepCard(1, "Pon tus links", "Uno por línea. Para nombrar el archivo escribe «Nombre | link».")
         self.text = QPlainTextEdit()
-        self.text.setPlaceholderText("https://anyelostyle.com\nPromo otoño | anyelostyle.com/otono?utm_source=ig\n…")
-        v.addWidget(self.text, 3)
+        self.text.setPlaceholderText("https://anyelostyle.com\nPromo otoño | anyelostyle.com/otono\n…")
+        self.text.setMinimumHeight(110)
+        c1.body.addWidget(self.text)
+        r = QHBoxLayout()
+        self.count = muted("")
+        utm = QPushButton("Armar un link con UTM →")
+        utm.setObjectName("link")
+        utm.clicked.connect(lambda: win.tabs.setCurrentWidget(win.utm_tab))
+        r.addWidget(self.count, 1)
+        r.addWidget(utm)
+        c1.body.addLayout(r)
+
+        self.dest = DestinationCard(win.settings, 2)
+        win.register_destination(self.dest)
+
+        c3 = StepCard(3, "Genera", "Los QR se guardan en tu carpeta. También puedes copiar uno al portapapeles.")
         row = QHBoxLayout()
         self.btn = QPushButton("Generar QR")
         self.btn.setObjectName("primary")
         self.btn.clicked.connect(self.generate)
-        self.open_btn = QPushButton("Abrir carpeta")
-        self.open_btn.clicked.connect(lambda: open_folder(self.win.panel.out_dir()))
-        self.count = muted("")
+        self.copy_btn = QPushButton("Copiar QR al portapapeles")
+        self.copy_btn.clicked.connect(lambda: win.copy_qr(self._items(), self.table))
         row.addWidget(self.btn)
-        row.addWidget(self.open_btn)
-        row.addWidget(self.count, 1)
-        v.addLayout(row)
+        row.addWidget(self.copy_btn)
+        row.addStretch()
+        c3.body.addLayout(row)
         self.table = ResultsTable()
-        v.addWidget(self.table, 2)
+        c3.body.addWidget(self.table)
+
+        v.addWidget(c1)
+        v.addWidget(self.dest)
+        v.addWidget(c3)
+        v.addStretch()
+        outer = QVBoxLayout(self)
+        outer.setContentsMargins(0, 0, 0, 0)
+        outer.addWidget(scrolled(page))
 
         self._timer = QTimer(singleShot=True, interval=300)
         self._timer.timeout.connect(self._sample)
         self.text.textChanged.connect(self._timer.start)
         win.panel.changed.connect(self._sample)
 
+    def append_line(self, line: str):
+        cur = self.text.toPlainText().rstrip("\n")
+        self.text.setPlainText((cur + "\n" if cur else "") + line)
+
     def _items(self) -> list[Item]:
-        return parse_lines(self.text.toPlainText(), self.win.panel.opt_https.isChecked())
+        return parse_lines(self.text.toPlainText(), self.win.settings.add_https)
 
     def _sample(self):
         items = self._items()
-        n = len(items)
-        self.count.setText(f"{n} QR en la lista" if n else "")
+        self.count.setText(f"{len(items)} QR en la lista" if items else "")
         self.win.panel.set_sample(items[0].data if items else "")
 
     def generate(self):
@@ -402,7 +278,7 @@ class GenerateTab(QWidget):
         if not items:
             QMessageBox.information(self, brand.APP_NAME, "Pega al menos un link.")
             return
-        self.win.run_batch(items, self.table, [self.btn])
+        self.win.run_batch(items, self.table, [self.btn, self.copy_btn])
 
 
 class ExcelTab(QWidget):
@@ -412,22 +288,23 @@ class ExcelTab(QWidget):
         self.path = ""
         self.headers: list[str] = []
         self.rows: list[list[str]] = []
-        v = QVBoxLayout(self)
-        v.setContentsMargins(16, 16, 16, 16)
-        v.addWidget(muted("Carga un Excel (.xlsx) o un CSV y dile cuál columna es el nombre y cuál es el link. "
-                          "Si tu lista está en Google Sheets, descárgala como Excel o CSV."))
+        page = QWidget()
+        v = QVBoxLayout(page)
+        v.setContentsMargins(2, 8, 10, 8)
+        v.setSpacing(12)
+
+        c1 = StepCard(1, "Carga tu lista", "Un Excel (.xlsx) o un CSV. Si está en Google Sheets, descárgala como Excel o CSV.")
         top = QHBoxLayout()
-        self.pick = QPushButton("Elegir archivo…")
-        self.pick.clicked.connect(self.choose)
+        pick = QPushButton("Elegir archivo…")
+        pick.clicked.connect(self.choose)
         self.file_lbl = muted("Ningún archivo cargado")
         self.sheet = QComboBox()
         self.sheet.setVisible(False)
         self.sheet.currentTextChanged.connect(self._sheet_changed)
-        top.addWidget(self.pick)
+        top.addWidget(pick)
         top.addWidget(self.file_lbl, 1)
         top.addWidget(self.sheet)
-        v.addLayout(top)
-
+        c1.body.addLayout(top)
         cols = QHBoxLayout()
         self.name_col = QComboBox()
         self.data_col = QComboBox()
@@ -436,26 +313,36 @@ class ExcelTab(QWidget):
         cols.addSpacing(12)
         cols.addWidget(QLabel("Link o dato del QR:"))
         cols.addWidget(self.data_col, 1)
-        v.addLayout(cols)
-
+        c1.body.addLayout(cols)
         self.preview = QTableWidget()
         self.preview.setEditTriggers(QTableWidget.NoEditTriggers)
         self.preview.verticalHeader().setVisible(False)
-        v.addWidget(self.preview, 2)
+        self.preview.setMaximumHeight(190)
+        self.preview.setMinimumHeight(120)
+        c1.body.addWidget(self.preview)
 
+        self.dest = DestinationCard(win.settings, 2)
+        win.register_destination(self.dest)
+
+        c3 = StepCard(3, "Genera", "Un QR por cada fila de tu lista.")
         row = QHBoxLayout()
         self.btn = QPushButton("Generar un QR por fila")
         self.btn.setObjectName("primary")
         self.btn.setEnabled(False)
         self.btn.clicked.connect(self.generate)
-        self.open_btn = QPushButton("Abrir carpeta")
-        self.open_btn.clicked.connect(lambda: open_folder(self.win.panel.out_dir()))
         row.addWidget(self.btn)
-        row.addWidget(self.open_btn)
         row.addStretch()
-        v.addLayout(row)
+        c3.body.addLayout(row)
         self.table = ResultsTable()
-        v.addWidget(self.table, 2)
+        c3.body.addWidget(self.table)
+
+        v.addWidget(c1)
+        v.addWidget(self.dest)
+        v.addWidget(c3)
+        v.addStretch()
+        outer = QVBoxLayout(self)
+        outer.setContentsMargins(0, 0, 0, 0)
+        outer.addWidget(scrolled(page))
         self.name_col.currentIndexChanged.connect(self._sample)
         self.data_col.currentIndexChanged.connect(self._sample)
 
@@ -509,7 +396,7 @@ class ExcelTab(QWidget):
 
     def _items(self) -> list[Item]:
         return items_from_table(self.rows, self.name_col.currentData(), self.data_col.currentData(),
-                                self.win.panel.opt_https.isChecked())
+                                self.win.settings.add_https)
 
     def _sample(self):
         if self.rows:
@@ -530,7 +417,7 @@ class ReadTab(QWidget):
         self.win = win
         self.found = []
         v = QVBoxLayout(self)
-        v.setContentsMargins(16, 16, 16, 16)
+        v.setContentsMargins(2, 8, 10, 8)
         self.drop = DropZone("Arrastra aquí imágenes, PDFs o carpetas con códigos QR")
         self.drop.dropped.connect(self.read)
         v.addWidget(self.drop, 1)
@@ -539,8 +426,10 @@ class ReadTab(QWidget):
         b1.clicked.connect(self.pick_files)
         b2 = QPushButton("Elegir carpeta…")
         b2.clicked.connect(self.pick_folder)
-        row.addWidget(b1)
-        row.addWidget(b2)
+        b3 = QPushButton("Escanear la pantalla…")
+        b3.clicked.connect(lambda: win.scanner.show_menu())
+        for b in (b1, b2, b3):
+            row.addWidget(b)
         row.addStretch()
         v.addLayout(row)
 
@@ -634,16 +523,212 @@ class ReadTab(QWidget):
             QDesktopServices.openUrl(QUrl(f.text))
 
 
+UTM_PRESETS = [("Instagram", "instagram", "social"), ("TikTok", "tiktok", "social"), ("YouTube", "youtube", "video"),
+               ("WhatsApp", "whatsapp", "mensaje"), ("Facebook", "facebook", "social"), ("Email", "newsletter", "email"),
+               ("QR impreso", "qr", "impreso")]
+
+
+class UtmTab(QWidget):
+    def __init__(self, win: "MainWindow"):
+        super().__init__()
+        self.win = win
+        page = QWidget()
+        v = QVBoxLayout(page)
+        v.setContentsMargins(2, 8, 10, 8)
+        v.setSpacing(12)
+        c = StepCard(1, "Arma tu link con UTM", "Los parámetros UTM te dicen de dónde llegó cada visita en Google Analytics.")
+        self.base = QLineEdit()
+        self.base.setPlaceholderText("anyelostyle.com/promo")
+        c.body.addWidget(QLabel("Link base"))
+        c.body.addWidget(self.base)
+
+        c.body.addWidget(muted("Atajos para fuente y medio:"))
+        chips = QHBoxLayout()
+        for label, src, med in UTM_PRESETS:
+            b = QPushButton(label)
+            b.setObjectName("chip")
+            b.clicked.connect(lambda _=False, s=src, m=med: self._preset(s, m))
+            chips.addWidget(b)
+        chips.addStretch()
+        c.body.addLayout(chips)
+
+        self.fields = {}
+        grid = QVBoxLayout()
+        for key, label, ph in (("source", "Fuente (utm_source)", "instagram"), ("medium", "Medio (utm_medium)", "social"),
+                               ("campaign", "Campaña (utm_campaign)", "otono-2026"),
+                               ("term", "Término (opcional)", ""), ("content", "Contenido (opcional)", "")):
+            row = QHBoxLayout()
+            lb = QLabel(label)
+            lb.setFixedWidth(190)
+            e = QLineEdit()
+            e.setPlaceholderText(ph)
+            e.textChanged.connect(self.update_result)
+            row.addWidget(lb)
+            row.addWidget(e, 1)
+            grid.addLayout(row)
+            self.fields[key] = e
+        c.body.addLayout(grid)
+        self.lower = QCheckBox("Pasar todo a minúsculas (recomendado: Analytics distingue mayúsculas)")
+        self.lower.setChecked(True)
+        self.lower.toggled.connect(self.update_result)
+        c.body.addWidget(self.lower)
+        self.base.textChanged.connect(self.update_result)
+
+        c2 = StepCard(2, "Tu link", "Cópialo o súmalo a la lista de QR.")
+        self.result = QLineEdit()
+        self.result.setReadOnly(True)
+        c2.body.addWidget(self.result)
+        self.hint = muted("")
+        c2.body.addWidget(self.hint)
+        row = QHBoxLayout()
+        self.add_btn = QPushButton("Agregar a la lista de QR")
+        self.add_btn.setObjectName("primary")
+        self.add_btn.clicked.connect(self.add_to_list)
+        self.copy_btn = QPushButton("Copiar link")
+        self.copy_btn.clicked.connect(self.copy)
+        row.addWidget(self.add_btn)
+        row.addWidget(self.copy_btn)
+        row.addStretch()
+        c2.body.addLayout(row)
+        v.addWidget(c)
+        v.addWidget(c2)
+        v.addStretch()
+        outer = QVBoxLayout(self)
+        outer.setContentsMargins(0, 0, 0, 0)
+        outer.addWidget(scrolled(page))
+        self.update_result()
+
+    def _preset(self, source, medium):
+        self.fields["source"].setText(source)
+        self.fields["medium"].setText(medium)
+
+    def link(self) -> str:
+        f = {k: e.text() for k, e in self.fields.items()}
+        return build_utm(self.base.text(), f["source"], f["medium"], f["campaign"], f["term"], f["content"], self.lower.isChecked())
+
+    def update_result(self, *_):
+        try:
+            self.result.setText(self.link())
+            self.hint.setText("")
+            ok = True
+        except ValueError as exc:
+            self.result.setText("")
+            self.hint.setText(str(exc))
+            ok = False
+        self.add_btn.setEnabled(ok)
+        self.copy_btn.setEnabled(ok)
+
+    def copy(self):
+        QGuiApplication.clipboard().setText(self.result.text())
+        self.hint.setText("Link copiado.")
+
+    def add_to_list(self):
+        name = "_".join(x for x in (self.fields["campaign"].text(), self.fields["source"].text()) if x.strip())
+        line = f"{safe_filename(name)} | {self.result.text()}" if name else self.result.text()
+        self.win.generate_tab.append_line(line)
+        self.win.tabs.setCurrentWidget(self.win.generate_tab)
+        self.win.status.setText("Link agregado a tu lista de QR")
+
+
+class SettingsTab(QWidget):
+    def __init__(self, win: "MainWindow"):
+        super().__init__()
+        self.win = win
+        s = win.settings
+        page = QWidget()
+        v = QVBoxLayout(page)
+        v.setContentsMargins(2, 8, 10, 8)
+        v.setSpacing(12)
+
+        c1 = StepCard(1, "Atajo para escanear QR", "Funciona desde cualquier programa mientras Anyelo Style QR siga abierto.")
+        self.hk_on = QCheckBox("Activar el atajo global")
+        self.hk_on.setChecked(s.hotkey_enabled)
+        self.hk_edit = QKeySequenceEdit()
+        self.hk_edit.setMaximumSequenceLength(1)
+        from PySide6.QtGui import QKeySequence
+        self.hk_edit.setKeySequence(QKeySequence(s.hotkey))
+        self.hk_status = muted("")
+        row = QHBoxLayout()
+        row.addWidget(QLabel("Combinación:"))
+        row.addWidget(self.hk_edit, 1)
+        c1.body.addWidget(self.hk_on)
+        c1.body.addLayout(row)
+        c1.body.addWidget(self.hk_status)
+        self.keep = QCheckBox("Al cerrar la ventana, seguir en segundo plano (ícono junto al reloj)")
+        self.keep.setChecked(s.keep_running)
+        c1.body.addWidget(self.keep)
+
+        c2 = StepCard(2, "Al generar", "Valores que casi nunca hace falta tocar.")
+        self.o_https = QCheckBox("Agregar https:// cuando falte")
+        self.o_dupes = QCheckBox("Omitir links repetidos")
+        self.o_verify = QCheckBox("Leer de vuelta cada QR creado para confirmar que escanea")
+        self.o_over = QCheckBox("Reemplazar archivos que ya existen (si no, se agrega -2, -3…)")
+        for cb, val in ((self.o_https, s.add_https), (self.o_dupes, s.skip_dupes), (self.o_verify, s.verify), (self.o_over, s.overwrite)):
+            cb.setChecked(val)
+            c2.body.addWidget(cb)
+            cb.toggled.connect(self._save)
+
+        c3 = StepCard(3, "Acerca de")
+        c3.body.addWidget(muted(f"{brand.APP_NAME} v{brand.VERSION} · código abierto (MIT) · funciona sin internet."))
+        v.addWidget(c1)
+        v.addWidget(c2)
+        v.addWidget(c3)
+        v.addStretch()
+        outer = QVBoxLayout(self)
+        outer.setContentsMargins(0, 0, 0, 0)
+        outer.addWidget(scrolled(page))
+
+        self.hk_on.toggled.connect(self._hotkey_changed)
+        self.hk_edit.editingFinished.connect(self._hotkey_changed)
+        self.keep.toggled.connect(self._save)
+        self.refresh_status()
+
+    def _save(self, *_):
+        s = self.win.settings
+        s.keep_running = self.keep.isChecked()
+        s.add_https, s.skip_dupes = self.o_https.isChecked(), self.o_dupes.isChecked()
+        s.verify, s.overwrite = self.o_verify.isChecked(), self.o_over.isChecked()
+        s.save()
+        self.win.panel.refresh()
+
+    def _hotkey_changed(self, *_):
+        s = self.win.settings
+        seq = self.hk_edit.keySequence().toString()
+        s.hotkey_enabled = self.hk_on.isChecked()
+        if seq:
+            s.hotkey = seq
+        ok, msg = self.win.apply_hotkey()
+        if not ok and s.hotkey_enabled:
+            self.hk_status.setText(msg)
+        else:
+            self.refresh_status()
+        s.save()
+
+    def refresh_status(self):
+        s = self.win.settings
+        if not GlobalHotkey.supported():
+            self.hk_status.setText("El atajo global solo funciona en Windows.")
+        elif self.win.hotkey.active:
+            self.hk_status.setText(f"Activo: {s.hotkey}")
+        else:
+            self.hk_status.setText("Desactivado.")
+
+
 # ---------- ventana ----------
 
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle(brand.APP_NAME)
-        self.resize(1180, 760)
-        self.setMinimumSize(980, 640)
+        self.resize(1200, 780)
+        self.setMinimumSize(1000, 640)
         self._job: Job | None = None
+        self._quitting = False
+        self._destinations: list[DestinationCard] = []
         self.settings = Settings.load()
+        self.tray: QSystemTrayIcon | None = None
+        self.hotkey = GlobalHotkey(lambda: self.scanner.show_menu())
+        self.scanner = Scanner(self, lambda: self.settings.hotkey if self.hotkey.active else "")
 
         root = QWidget()
         root.setObjectName("root")
@@ -660,24 +745,35 @@ class MainWindow(QMainWindow):
         head.addSpacing(8)
         head.addWidget(title)
         head.addStretch()
-        ver = QLabel(f"v{brand.VERSION} · funciona sin internet")
-        ver.setObjectName("muted")
+        scan = QPushButton("Escanear QR en pantalla")
+        scan.clicked.connect(lambda: self.scanner.show_menu())
+        ver = muted(f"v{brand.VERSION} · funciona sin internet")
+        ver.setWordWrap(False)
+        head.addWidget(scan)
+        head.addSpacing(12)
         head.addWidget(ver)
         outer.addLayout(head)
 
         body = QHBoxLayout()
         self.panel = StylePanel(self.settings)
         self.tabs = QTabWidget()
-        self.tabs.addTab(GenerateTab(self), "Generar")
-        self.tabs.addTab(ExcelTab(self), "Excel / CSV")
-        self.tabs.addTab(ReadTab(self), "Leer QR")
-        scroll = QScrollArea()
-        scroll.setWidget(self.panel)
-        scroll.setWidgetResizable(True)
-        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-        scroll.setFixedWidth(322)
+        self.generate_tab = GenerateTab(self)
+        self.excel_tab = ExcelTab(self)
+        self.utm_tab = UtmTab(self)
+        self.read_tab = ReadTab(self)
+        self.settings_tab = SettingsTab(self)
+        self.tabs.addTab(self.generate_tab, "Generar")
+        self.tabs.addTab(self.excel_tab, "Excel / CSV")
+        self.tabs.addTab(self.utm_tab, "UTM")
+        self.tabs.addTab(self.read_tab, "Leer QR")
+        self.tabs.addTab(self.settings_tab, "Ajustes")
+        sc = QScrollArea()
+        sc.setWidget(self.panel)
+        sc.setWidgetResizable(True)
+        sc.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        sc.setFixedWidth(322)
         body.addWidget(self.tabs, 1)
-        body.addWidget(scroll)
+        body.addWidget(sc)
         outer.addLayout(body, 1)
 
         foot = QHBoxLayout()
@@ -688,6 +784,74 @@ class MainWindow(QMainWindow):
         foot.addWidget(self.status, 1)
         foot.addWidget(self.bar)
         outer.addLayout(foot)
+
+        self._setup_tray()
+        self.apply_hotkey()
+        self.settings_tab.refresh_status()
+
+    # --- atajo y bandeja ---
+    def apply_hotkey(self) -> tuple[bool, str]:
+        if not self.settings.hotkey_enabled:
+            self.hotkey.unregister()
+            self._refresh_tray_text()
+            return True, ""
+        ok, msg = self.hotkey.register(self.settings.hotkey)
+        self._refresh_tray_text()
+        return ok, msg
+
+    def _setup_tray(self):
+        if not QSystemTrayIcon.isSystemTrayAvailable():
+            return
+        self.tray = QSystemTrayIcon(QIcon(str(asset("icon.ico"))), self)
+        menu = QMenu()
+        self.act_scan = QAction("Escanear QR…", self)
+        self.act_scan.triggered.connect(lambda: self.scanner.show_menu())
+        act_open = QAction("Abrir Anyelo Style QR", self)
+        act_open.triggered.connect(self.show_window)
+        act_quit = QAction("Salir", self)
+        act_quit.triggered.connect(self.quit_app)
+        menu.addAction(self.act_scan)
+        menu.addAction(act_open)
+        menu.addSeparator()
+        menu.addAction(act_quit)
+        self.tray.setContextMenu(menu)
+        self.tray.activated.connect(lambda r: self.scanner.show_menu() if r == QSystemTrayIcon.Trigger else None)
+        self.tray.show()
+        self._refresh_tray_text()
+
+    def _refresh_tray_text(self):
+        if self.tray:
+            hk = f" ({self.settings.hotkey})" if self.hotkey.active else ""
+            self.tray.setToolTip(f"{brand.APP_NAME}{hk}")
+
+    def show_window(self):
+        self.show()
+        self.raise_()
+        self.activateWindow()
+
+    def quit_app(self):
+        self._quitting = True
+        self.hotkey.unregister()
+        if self.tray:
+            self.tray.hide()
+        QApplication.quit()
+
+    def closeEvent(self, e):
+        if not self._quitting and self.tray and self.settings.keep_running:
+            e.ignore()
+            self.hide()
+            if not getattr(self, "_told", False):
+                self._told = True
+                hk = f" Atajo: {self.settings.hotkey}." if self.hotkey.active else ""
+                self.tray.showMessage(brand.APP_NAME, "Sigue activo junto al reloj." + hk, QSystemTrayIcon.Information, 4000)
+            return
+        self.hotkey.unregister()
+        e.accept()
+
+    # --- destinos sincronizados ---
+    def register_destination(self, card: DestinationCard):
+        self._destinations.append(card)
+        card.changed.connect(lambda c=card: [d.load() for d in self._destinations if d is not c])
 
     # --- trabajos en segundo plano ---
     def run_job(self, fn, on_done, lock=()):
@@ -727,17 +891,20 @@ class MainWindow(QMainWindow):
         self.status.setText(f"{i} de {n}")
 
     def run_batch(self, items: list[Item], table: ResultsTable, lock):
-        p = self.panel
-        if not p.out_dir():
-            p._pick_folder()
-            if not p.out_dir():
+        s = self.settings
+        if not s.out_dir:
+            d = QFileDialog.getExistingDirectory(self, "¿Dónde guardo los QR?", str(Path.home()))
+            if not d:
                 return
-        fmts = p.fmts()
-        if not fmts:
-            QMessageBox.information(self, brand.APP_NAME, "Marca al menos un formato (PNG, SVG o PDF).")
+            s.out_dir = d
+            s.save()
+            for card in self._destinations:
+                card.load()
+        if not s.fmts:
+            QMessageBox.information(self, brand.APP_NAME, "Marca al menos un formato (PNG, SVG o PDF) en el paso 2.")
             return
-        style, out = p.style(), p.out_dir()
-        dupes, ver, over = p.opt_dupes.isChecked(), p.opt_verify.isChecked(), p.opt_over.isChecked()
+        style, out, fmts = self.panel.style(), s.out_dir, list(s.fmts)
+        dupes, ver, over, after = s.skip_dupes, s.verify, s.overwrite, s.open_after
 
         def fn(prog):
             return generate_batch(items, out, fmts, style, ver, dupes, over, prog)
@@ -747,18 +914,50 @@ class MainWindow(QMainWindow):
             ok = sum(r.status == "ok" for r in rows)
             bad = sum(r.status in ("aviso", "error") for r in rows)
             self.status.setText(f"{ok} QR listos" + (f" · {bad} para revisar" if bad else ""))
+            if after and (ok or bad):
+                open_folder(out)
 
         self.run_job(fn, done, lock)
+
+    def copy_qr(self, items: list[Item], table: ResultsTable):
+        data = None
+        row = table.currentRow() if table.isVisible() else -1
+        if row >= 0:
+            data = table.item(row, 0).data(Qt.UserRole)
+        if not data and items:
+            data = items[0].data
+        if not data:
+            QMessageBox.information(self, brand.APP_NAME, "Pega un link primero.")
+            return
+        try:
+            img = render_png(data, self.panel.style())
+        except Exception as exc:
+            QMessageBox.warning(self, brand.APP_NAME, f"No pude crear ese QR.\n\n{exc}")
+            return
+        QGuiApplication.clipboard().setImage(pil_to_qimage(img))
+        extra = " (el primero de tu lista)" if len(items) > 1 and row < 0 else ""
+        self.status.setText(f"QR copiado al portapapeles{extra}: {data[:60]}")
 
 
 def main():
     app = QApplication(sys.argv)
     app.setApplicationName(brand.APP_NAME)
     app.setOrganizationName(brand.ORG)
-    app.setStyleSheet(QSS)
+    app.setQuitOnLastWindowClosed(False)
+    app.setStyleSheet(build_qss())
     icon = asset("icon.ico")
     if icon.exists():
         app.setWindowIcon(QIcon(str(icon)))
+
+    lock = QLockFile(str(Path(tempfile.gettempdir()) / "AnyeloStyleQR.lock"))
+    lock.setStaleLockTime(0)
+    if not lock.tryLock(200):
+        QMessageBox.information(None, brand.APP_NAME,
+                                "Anyelo Style QR ya está abierto. Búscalo junto al reloj (ícono en la bandeja).")
+        sys.exit(0)
+
     win = MainWindow()
     win.show()
-    sys.exit(app.exec())
+    code = app.exec()
+    lock.unlock()
+    sys.exit(code)

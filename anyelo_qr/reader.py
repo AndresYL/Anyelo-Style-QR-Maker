@@ -64,6 +64,8 @@ def read_pil(img: Image.Image) -> list[tuple[str, str]]:
     attempts = [rgb, ImageOps.autocontrast(rgb.convert("L"))]
     if max(rgb.size) > 2400:
         attempts.append(rgb.resize((rgb.width // 2, rgb.height // 2), Image.LANCZOS))
+    if max(rgb.size) < 500:  # recortes pequeños (por ejemplo, de la pantalla)
+        attempts.append(rgb.resize((rgb.width * 3, rgb.height * 3), Image.LANCZOS))
     for cand in attempts:
         res = zxingcpp.read_barcodes(cand)
         if res:
