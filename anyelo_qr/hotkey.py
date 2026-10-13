@@ -35,6 +35,54 @@ def parse_hotkey(text: str) -> tuple[int, int]:
     raise ValueError("Usa una letra, un número o una tecla F1 a F12.")
 
 
+def vk_to_name(vk: int) -> str | None:
+    """Código de tecla virtual de Windows -> nombre (letras, números y F1 a F12)."""
+    if 0x41 <= vk <= 0x5A or 0x30 <= vk <= 0x39:
+        return chr(vk)
+    if 0x70 <= vk <= 0x7B:
+        return f"F{vk - 0x6F}"
+    return None
+
+
+def format_hotkey(mods: int, vk: int) -> str:
+    parts = []
+    if mods & MOD_CONTROL:
+        parts.append("Ctrl")
+    if mods & MOD_ALT:
+        parts.append("Alt")
+    if mods & MOD_SHIFT:
+        parts.append("Shift")
+    if mods & MOD_WIN:
+        parts.append("Win")
+    name = vk_to_name(vk)
+    if not name:
+        raise ValueError("Usa una letra, un número o una tecla F1 a F12.")
+    return "+".join(parts + [name])
+
+
+def altgr_conflict(text: str) -> str | None:
+    """Carácter que escribiría esta combinación en el teclado actual (por ejemplo «@»), si lo hay."""
+    from .winfx import altgr_char
+    try:
+        mods, vk = parse_hotkey(text)
+    except ValueError:
+        return None
+    if mods & MOD_CONTROL and mods & MOD_ALT:
+        return altgr_char(vk, bool(mods & MOD_SHIFT))
+    return None
+
+
+FACTORY_HOTKEY = "Ctrl+Alt+Q"
+
+
+def default_hotkey() -> str:
+    """Ctrl+Alt+Q si no choca con tu teclado; si choca (AltGr+Q = @), la alternativa más cercana."""
+    for cand in (FACTORY_HOTKEY, "Ctrl+Shift+Q", "Ctrl+Alt+Shift+Q"):
+        if altgr_conflict(cand) is None:
+            return cand
+    return "Ctrl+Shift+Q"
+
+
 class _Filter(QAbstractNativeEventFilter):
     def __init__(self, hotkey_id: int, callback: Callable[[], None]):
         super().__init__()

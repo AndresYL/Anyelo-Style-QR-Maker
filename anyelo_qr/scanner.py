@@ -1,17 +1,17 @@
-"""Escaneo de QR desde la pantalla: menú del atajo, región, pantalla completa o archivo."""
+"""Menú del atajo global: escanear (región, pantalla completa, archivo) o crear / abrir el programa."""
 from __future__ import annotations
 
-from pathlib import Path
-
-from PySide6.QtCore import QEvent, QPoint, QRect, Qt, QTimer, QUrl, Signal, QObject
-from PySide6.QtGui import QColor, QCursor, QDesktopServices, QFont, QGuiApplication, QPainter, QPen, QPixmap, QShortcut, QKeySequence
+from PySide6.QtCore import QEvent, QObject, QPoint, QRect, Qt, QTimer, QUrl, Signal
+from PySide6.QtGui import (QColor, QCursor, QDesktopServices, QGuiApplication, QKeySequence, QPainter, QPen, QPixmap,
+                           QShortcut)
 from PySide6.QtWidgets import (QApplication, QDialog, QFileDialog, QFrame, QHBoxLayout, QLabel, QMessageBox,
-                               QPushButton, QVBoxLayout, QWidget)
+                               QVBoxLayout, QWidget)
 
 from . import brand
+from .fonts import font
 from .paths import DEFAULT_LOGO
 from .reader import Found, analyze_link, is_url, read_paths, read_pil
-from .widgets import muted, qimage_to_pil
+from .widgets import CtaButton, LinkButton, Pill, eyebrow, headline, muted, qimage_to_pil, section
 
 
 def grab_screen(screen):
@@ -27,88 +27,98 @@ def read_text_hits(pil_img, source: str) -> list[Found]:
 # ---------- menú del atajo ----------
 
 class ScanMenu(QWidget):
-    chosen = Signal(str)   # region | screen | file
+    chosen = Signal(str)   # region | screen | file | create | open
 
-    OPTIONS = [
-        ("region", "Escanear región", "Marca con el ratón el QR que estás viendo", "1"),
-        ("screen", "Escanear pantalla completa", "Busca todos los QR visibles ahora", "2"),
-        ("file", "Escanear imagen del computador", "Elige una imagen o un PDF", "3"),
+    GROUPS = [
+        ("Escanear", [
+            ("region", "Escanear región", "Marca con el ratón el QR que estás viendo", "1"),
+            ("screen", "Pantalla completa", "Busca todos los QR visibles ahora", "2"),
+            ("file", "Imagen del computador", "Elige una imagen o un PDF", "3"),
+        ]),
+        ("Crear", [
+            ("create", "Crear un QR", "Abre el programa listo para tus links", "4"),
+            ("open", "Abrir el programa", "Ir a la ventana principal", "5"),
+        ]),
     ]
 
     def __init__(self, hotkey_text: str = ""):
         super().__init__(None, Qt.Tool | Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint)
         self.setAttribute(Qt.WA_TranslucentBackground)
         self._ready = False
-        QTimer.singleShot(350, lambda: setattr(self, "_ready", True))
+        QTimer.singleShot(400, lambda: setattr(self, "_ready", True))
 
         outer = QVBoxLayout(self)
-        outer.setContentsMargins(12, 12, 12, 12)
+        outer.setContentsMargins(14, 14, 14, 14)
         card = QFrame()
         card.setObjectName("menuCard")
         outer.addWidget(card)
         v = QVBoxLayout(card)
-        v.setContentsMargins(20, 18, 20, 16)
-        v.setSpacing(10)
+        v.setContentsMargins(0, 0, 0, 0)
+        v.setSpacing(0)
 
         head = QHBoxLayout()
+        head.setContentsMargins(22, 20, 14, 8)
         logo = QLabel()
         logo.setPixmap(QPixmap(str(DEFAULT_LOGO)).scaled(34, 34, Qt.KeepAspectRatio, Qt.SmoothTransformation))
-        t = QLabel("¿Qué quieres escanear?")
-        t.setObjectName("h1")
-        t.setStyleSheet("font-size:17px;")
-        close = QPushButton("✕")
-        close.setObjectName("link")
+        close = LinkButton("×")
         close.clicked.connect(self.close)
         head.addWidget(logo)
-        head.addSpacing(8)
-        head.addWidget(t, 1)
+        head.addSpacing(10)
+        head.addWidget(headline("¿Qué quieres", "hacer", "?", px=22), 1)
         head.addWidget(close)
         v.addLayout(head)
 
-        for key, title, sub, num in self.OPTIONS:
-            v.addWidget(self._choice(key, title, sub, num))
+        keys = []
+        for title, options in self.GROUPS:
+            sec = section(title)
+            sec.layout().setContentsMargins(22, 14, 22, 4)
+            v.addWidget(sec)
+            for key, name, sub, num in options:
+                v.addWidget(self._choice(key, name, sub, num))
+                keys.append((key, num))
 
-        hint = "Esc para cerrar"
+        hint = "ESC para cerrar"
         if hotkey_text:
-            hint += f"  ·  Atajo: {hotkey_text}"
-        hl = QLabel(hint)
-        hl.setObjectName("muted")
-        v.addWidget(hl, alignment=Qt.AlignHCenter)
-        self.setFixedWidth(440)
+            hint += f"  ·  Atajo {hotkey_text}"
+        hl = eyebrow(hint, brand.MUTED, 10)
+        hl.setContentsMargins(22, 14, 22, 16)
+        v.addWidget(hl)
+        self.setFixedWidth(460)
 
         QShortcut(QKeySequence("Esc"), self, activated=self.close)
-        for key, _t, _s, num in self.OPTIONS:
-            QShortcut(QKeySequence(num), self, activated=lambda k=key: self._emit(k))
+        for key, num in keys:
+            QShortcut(QKeySequence(num), self, activated=lambda k=key: self.chosen.emit(k))
 
-    def _choice(self, key, title, sub, num) -> QPushButton:
+    def _choice(self, key, title, sub, num):
+        from PySide6.QtWidgets import QPushButton
         b = QPushButton()
         b.setObjectName("choice")
-        b.setFixedHeight(64)
+        b.setFixedHeight(60)
         b.setCursor(Qt.PointingHandCursor)
         lay = QHBoxLayout(b)
-        lay.setContentsMargins(14, 8, 14, 8)
+        lay.setContentsMargins(19, 6, 22, 6)
         k = QLabel(num)
         k.setObjectName("choiceKey")
-        k.setFixedSize(26, 26)
-        k.setAlignment(Qt.AlignCenter)
+        k.setFont(font("semibold", 13, 0.8))
+        k.setStyleSheet(f"color:{brand.RED_L};")
+        k.setFixedSize(26, 22)
         col = QVBoxLayout()
         col.setSpacing(0)
         a = QLabel(title)
         a.setObjectName("choiceTitle")
+        a.setFont(font("xbold", 16, -0.2))
         c = QLabel(sub)
         c.setObjectName("choiceSub")
+        c.setFont(font("regular", 12))
+        c.setStyleSheet(f"color:{brand.MUTED};")
         col.addWidget(a)
         col.addWidget(c)
-        lay.addWidget(k)
-        lay.addSpacing(6)
+        lay.addWidget(k, alignment=Qt.AlignTop)
         lay.addLayout(col, 1)
         for w in (k, a, c):
             w.setAttribute(Qt.WA_TransparentForMouseEvents)
-        b.clicked.connect(lambda: self._emit(key))
+        b.clicked.connect(lambda: self.chosen.emit(key))
         return b
-
-    def _emit(self, key):
-        self.chosen.emit(key)
 
     def show_centered(self):
         scr = QGuiApplication.screenAt(QCursor.pos()) or QGuiApplication.primaryScreen()
@@ -151,22 +161,23 @@ class RegionOverlay(QWidget):
     def paintEvent(self, _):
         p = QPainter(self)
         p.drawPixmap(0, 0, self.pix)
-        p.fillRect(self.rect(), QColor(0, 0, 0, 140))
+        p.fillRect(self.rect(), QColor(7, 7, 7, 170))
         sel = self._sel()
         if sel and sel.width() > 1 and sel.height() > 1:
             src = QRect(int(sel.x() * self.dpr), int(sel.y() * self.dpr), int(sel.width() * self.dpr), int(sel.height() * self.dpr))
             p.drawPixmap(sel, self.pix, src)
-            p.setPen(QPen(QColor("white"), 2))
+            p.setPen(QPen(QColor(brand.GOLD), 2))
             p.drawRect(sel)
-            p.setPen(QColor("white"))
-            p.drawText(sel.bottomLeft() + QPoint(2, 18), f"{sel.width()} × {sel.height()}")
+            p.setFont(font("semibold", 12, 0.8))
+            p.setPen(QColor(brand.GOLD))
+            p.drawText(sel.bottomLeft() + QPoint(2, 20), f"{sel.width()} × {sel.height()}")
         else:
-            f = QFont("Segoe UI", 15)
-            f.setBold(True)
-            p.setFont(f)
-            p.setPen(QColor("white"))
-            p.drawText(self.rect().adjusted(0, 40, 0, 0), Qt.AlignHCenter | Qt.AlignTop,
-                       "Arrastra para marcar el QR  ·  Esc para cancelar")
+            p.setFont(font("xbold", 22, -0.3))
+            p.setPen(QColor(brand.BONE))
+            p.drawText(self.rect().adjusted(0, 46, 0, 0), Qt.AlignHCenter | Qt.AlignTop, "Arrastra para marcar el QR")
+            p.setFont(font("semibold", 12, 1.2))
+            p.setPen(QColor(brand.GOLD))
+            p.drawText(self.rect().adjusted(0, 84, 0, 0), Qt.AlignHCenter | Qt.AlignTop, "ESC PARA CANCELAR")
 
     def mousePressEvent(self, e):
         if e.button() == Qt.RightButton:
@@ -220,50 +231,56 @@ class ScanResultDialog(QDialog):
     def __init__(self, found: list[Found], note: str = "", parent=None):
         super().__init__(parent, Qt.Dialog | Qt.WindowStaysOnTopHint)
         self.setWindowTitle(brand.APP_NAME)
-        self.setMinimumWidth(460)
+        self.setMinimumWidth(500)
         v = QVBoxLayout(self)
-        v.setContentsMargins(20, 18, 20, 16)
-        v.setSpacing(10)
-        title = QLabel(f"{len(found)} código(s) encontrado(s)" if found else "No encontré ningún QR")
-        title.setObjectName("h1")
-        title.setStyleSheet("font-size:17px;")
-        v.addWidget(title)
-        if not found:
+        v.setContentsMargins(26, 24, 26, 22)
+        v.setSpacing(12)
+        if found:
+            v.addWidget(eyebrow("Resultado"))
+            n = len(found)
+            v.addWidget(headline(f"{n} código{'s' if n != 1 else ''}", "encontrado" + ("s" if n != 1 else ""), px=26))
+        else:
+            v.addWidget(eyebrow("Resultado"))
+            v.addWidget(headline("No encontré", "ningún QR", px=26))
             v.addWidget(muted("Prueba a marcar solo el QR, con un poco de margen blanco alrededor, "
                               "o acércalo para que se vea más grande."))
         for f in found:
             v.addWidget(self._card(f))
         if note:
-            v.addWidget(muted(note))
-        close = QPushButton("Cerrar")
-        close.setObjectName("primary")
+            v.addWidget(muted(note, 12))
+        close = CtaButton("Cerrar", arrow=False)
         close.clicked.connect(self.accept)
+        v.addSpacing(4)
         v.addWidget(close, alignment=Qt.AlignRight)
 
     def _card(self, f: Found) -> QFrame:
         card = QFrame()
         card.setObjectName("resultCard")
         v = QVBoxLayout(card)
-        v.setContentsMargins(14, 12, 14, 12)
+        v.setContentsMargins(18, 14, 18, 14)
+        v.setSpacing(6)
         txt = QLabel(f.text)
+        txt.setFont(font("semibold", 14))
         txt.setWordWrap(True)
         txt.setTextInteractionFlags(Qt.TextSelectableByMouse)
-        txt.setStyleSheet("font-weight:600;")
         v.addWidget(txt)
         for w in f.warnings:
-            lb = QLabel("⚠ " + w)
-            lb.setObjectName("warn")
+            lb = QLabel("!  " + w)
+            lb.setFont(font("regular", 12))
+            lb.setStyleSheet(f"color:{brand.RED_L};")
             lb.setWordWrap(True)
             v.addWidget(lb)
         row = QHBoxLayout()
-        cp = QPushButton("Copiar")
-        cp.clicked.connect(lambda: (QGuiApplication.clipboard().setText(f.text), cp.setText("Copiado ✓")))
+        row.setSpacing(8)
+        cp = Pill("Copiar")
+        cp.clicked.connect(lambda: (QGuiApplication.clipboard().setText(f.text), cp.setText("Copiado")))
         row.addWidget(cp)
         if is_url(f.text):
-            op = QPushButton("Abrir link")
+            op = Pill("Abrir link")
             op.clicked.connect(lambda: self._open(f))
             row.addWidget(op)
         row.addStretch()
+        v.addSpacing(4)
         v.addLayout(row)
         return card
 
@@ -301,6 +318,12 @@ class Scanner(QObject):
     def _chosen(self, kind: str):
         if self.menu:
             self.menu.close()
+        if kind == "create":
+            self.main.open_create()
+            return
+        if kind == "open":
+            self.main.show_window()
+            return
         if kind == "file":
             self._pick_file()
             return

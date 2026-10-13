@@ -190,7 +190,41 @@ def test_settings_migration_and_defaults(tmp_path, monkeypatch):
     path.parent.mkdir(parents=True)
     path.write_text(json.dumps({"logo_mode": "default", "scale": 12, "fg": "#112233"}))   # formato de la v0.1
     s = Settings.load()
-    assert s.logo_mode == "none" and s.fg == "#112233" and s.schema == 2
+    assert s.logo_mode == "none" and s.fg == "#112233" and s.schema == 3
     s.logo_mode = "default"
     s.save()
     assert Settings.load().logo_mode == "default"      # ya migrado: respeta su elección
+
+
+def test_broken_hotkey_in_settings_is_replaced(tmp_path, monkeypatch):
+    """Si quedó guardado un atajo imposible (como Ctrl+Alt+@), el programa vuelve al recomendado."""
+    monkeypatch.setenv("APPDATA", str(tmp_path))
+    from anyelo_qr.hotkey import default_hotkey
+    path = tmp_path / "AnyeloStyleQR" / "settings.json"
+    path.parent.mkdir(parents=True)
+    for bad in ("Ctrl+Alt+@", "Q", "", "Ctrl+Alt"):
+        path.write_text(json.dumps({"schema": 3, "hotkey": bad}))
+        assert Settings.load().hotkey == default_hotkey()
+    path.write_text(json.dumps({"schema": 3, "hotkey": "Ctrl+Shift+F9"}))
+    assert Settings.load().hotkey == "Ctrl+Shift+F9"
+
+
+def test_altgr_conflict_moves_the_default(monkeypatch):
+    """En un teclado donde Ctrl+Alt+Q escribe «@», el recomendado deja de ser Ctrl+Alt+Q."""
+    import anyelo_qr.winfx as winfx
+    from anyelo_qr.hotkey import altgr_conflict, default_hotkey
+    monkeypatch.setattr(winfx, "altgr_char", lambda vk, shift=False: "@" if (vk == ord("Q") and not shift) else None)
+    assert altgr_conflict("Ctrl+Alt+Q") == "@"
+    assert altgr_conflict("Ctrl+Shift+Q") is None
+    assert default_hotkey() == "Ctrl+Shift+Q"
+
+
+def test_old_default_is_migrated_only_when_it_conflicts(tmp_path, monkeypatch):
+    monkeypatch.setenv("APPDATA", str(tmp_path))
+    import anyelo_qr.winfx as winfx
+    path = tmp_path / "AnyeloStyleQR" / "settings.json"
+    path.parent.mkdir(parents=True)
+    path.write_text(json.dumps({"schema": 2, "hotkey": "Ctrl+Alt+Q"}))
+    assert Settings.load().hotkey == "Ctrl+Alt+Q"                      # sin conflicto: se respeta
+    monkeypatch.setattr(winfx, "altgr_char", lambda vk, shift=False: "@" if vk == ord("Q") else None)
+    assert Settings.load().hotkey == "Ctrl+Shift+Q"                    # con conflicto (teclado latino): cambia

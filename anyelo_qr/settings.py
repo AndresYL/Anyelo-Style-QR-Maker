@@ -7,13 +7,27 @@ from pathlib import Path
 
 from .brand import DEFAULT_BG, DEFAULT_FG
 
-SCHEMA = 2
+SCHEMA = 3
 
 
 def settings_path() -> Path:
     base = os.environ.get("APPDATA")
     root = Path(base) if base else Path.home() / ".config"
     return root / "AnyeloStyleQR" / "settings.json"
+
+
+def _sane_hotkey(value: str, migrating: bool) -> str:
+    """Un atajo guardado que no sirve (por ejemplo «Ctrl+Alt+@») vuelve al recomendado."""
+    from .hotkey import FACTORY_HOTKEY, altgr_conflict, default_hotkey, parse_hotkey
+    if not value:
+        return default_hotkey()
+    try:
+        parse_hotkey(value)
+    except ValueError:
+        return default_hotkey()
+    if migrating and value == FACTORY_HOTKEY and altgr_conflict(value):
+        return default_hotkey()      # el de fábrica de la v0.2 quitaba la @ en teclados latinoamericanos
+    return value
 
 
 @dataclass
@@ -43,8 +57,13 @@ class Settings:
     overwrite: bool = False
     # atajo global
     hotkey_enabled: bool = True
-    hotkey: str = "Ctrl+Alt+Q"
+    hotkey: str = ""             # vacío = el recomendado para tu teclado
     keep_running: bool = True
+
+    def __post_init__(self):
+        if not self.hotkey:
+            from .hotkey import default_hotkey
+            self.hotkey = default_hotkey()
 
     @classmethod
     def load(cls) -> "Settings":
@@ -54,10 +73,13 @@ class Settings:
             s = cls(**{k: v for k, v in data.items() if k in known})
             if data.get("schema", 1) < 2:      # la v0.1 traía el logo activado por defecto
                 s.logo_mode = "none"
+            s.hotkey = _sane_hotkey(s.hotkey, migrating=data.get("schema", 1) < 3)
             s.schema = SCHEMA
             return s
         except Exception:
-            return cls()
+            s = cls()
+            s.hotkey = _sane_hotkey("", False)
+            return s
 
     def save(self) -> None:
         try:
