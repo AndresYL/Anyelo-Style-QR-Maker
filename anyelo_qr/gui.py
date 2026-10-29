@@ -4,12 +4,11 @@ from __future__ import annotations
 import csv
 import re
 import sys
-import tempfile
 import time
 from dataclasses import replace
 from pathlib import Path
 
-from PySide6.QtCore import QLockFile, QTimer, Qt, QUrl, Signal
+from PySide6.QtCore import QTimer, Qt, QUrl, Signal
 from PySide6.QtGui import QAction, QColor, QDesktopServices, QGuiApplication, QIcon, QPainter, QPixmap
 from PySide6.QtWidgets import (
     QApplication, QCheckBox, QComboBox, QFileDialog, QFrame, QGridLayout, QHBoxLayout, QHeaderView, QLabel, QLineEdit,
@@ -21,6 +20,7 @@ from . import brand, winfx
 from .core import (ERROR_LEVELS, EYE_SHAPES, MAX_PX, MIN_PX, SHAPES, Item, QRStyle, build_utm, generate_batch,
                    normalize_data, parse_lines, render_png, safe_filename, style_warnings, verify)
 from .fonts import font, load_fonts
+from .instance import InstanceGuard
 from .hotkey import FACTORY_HOTKEY, GlobalHotkey, altgr_conflict, default_hotkey
 from .paths import DEFAULT_LOGO, asset
 from .reader import is_url, read_paths
@@ -676,7 +676,20 @@ class SettingsTab(Page):
         self.keep.setChecked(s.keep_running)
         c1.body.addWidget(self.keep)
 
-        c2 = StepCard(2, "Al generar", "Valores que casi nunca hace falta tocar.")
+        c0 = StepCard(2, "Inicio con Windows", "Para que el atajo ya esté listo cuando prendes el computador.")
+        self.auto = QCheckBox("Abrir al iniciar Windows, minimizado junto al reloj")
+        c0.body.addWidget(self.auto)
+        self.auto_note = muted("", 12)
+        c0.body.addWidget(self.auto_note)
+        self.auto.setChecked(winfx.autostart_enabled())
+        if not winfx.autostart_supported():
+            self.auto.setEnabled(False)
+            self.auto_note.setText("Disponible en el programa instalado (.exe). Aquí no se puede activar.")
+        else:
+            self.auto_note.setText("Se abre escondido: solo aparece el ícono junto al reloj.")
+        self.auto.toggled.connect(self._toggle_autostart)
+
+        c2 = StepCard(3, "Al generar", "Valores que casi nunca hace falta tocar.")
         self.o_https = QCheckBox("Agregar https:// cuando falte")
         self.o_dupes = QCheckBox("Omitir links repetidos")
         self.o_verify = QCheckBox("Leer de vuelta cada QR creado para confirmar que escanea")
@@ -686,10 +699,11 @@ class SettingsTab(Page):
             c2.body.addWidget(cb)
             cb.toggled.connect(self._save)
 
-        c3 = StepCard(3, "Acerca de")
+        c3 = StepCard(4, "Acerca de")
         c3.body.addWidget(muted(f"{brand.APP_NAME} v{brand.VERSION} · código abierto (MIT) · funciona sin internet. "
                                 "Tipografía: Bricolage Grotesque (SIL OFL).", 13))
         self.body.addWidget(c1)
+        self.body.addWidget(c0)
         self.body.addWidget(c2)
         self.body.addWidget(c3)
         self.body.addStretch()
@@ -708,6 +722,15 @@ class SettingsTab(Page):
         s.verify, s.overwrite = self.o_verify.isChecked(), self.o_over.isChecked()
         s.save()
         self.win.panel.refresh()
+
+    def _toggle_autostart(self, on: bool):
+        if winfx.set_autostart(on):
+            self.win.toast.show_message("Se abrirá con Windows, minimizado." if on else "Ya no se abre con Windows.")
+        else:
+            self.auto.blockSignals(True)
+            self.auto.setChecked(not on)
+            self.auto.blockSignals(False)
+            self.win.toast.show_message("No pude cambiar el inicio con Windows.", "warn")
 
     def _toggle_hotkey(self, on: bool):
         self.win.settings.hotkey_enabled = on
@@ -1106,10 +1129,18 @@ def _splash() -> QSplashScreen:
 
 
 def main():
+    minimized = "--minimized" in sys.argv[1:]
     app = QApplication(sys.argv)
     app.setApplicationName(brand.APP_NAME)
     app.setOrganizationName(brand.ORG)
     app.setQuitOnLastWindowClosed(False)
+
+    guard = InstanceGuard()
+    if guard.notify_running():           # ya está abierto: lo traemos al frente y salimos
+        sys.exit(0)
+    winfx.create_app_mutex()
+    winfx.refresh_autostart_path()
+
     load_fonts()
     app.setFont(font("regular", 13))
     app.setStyleSheet(build_qss())
@@ -1117,21 +1148,20 @@ def main():
     if icon.exists():
         app.setWindowIcon(QIcon(str(icon)))
 
-    lock = QLockFile(str(Path(tempfile.gettempdir()) / "AnyeloStyleQR.lock"))
-    lock.setStaleLockTime(0)
-    if not lock.tryLock(200):
-        QMessageBox.information(None, brand.APP_NAME,
-                                "Anyelo Style QR ya está abierto. Búscalo junto al reloj (ícono en la bandeja).")
-        sys.exit(0)
-
-    splash = _splash()
-    splash.show()
-    app.processEvents()
+    splash = None
+    if not minimized:
+        splash = _splash()
+        splash.show()
+        app.processEvents()
     t0 = time.monotonic()
     win = MainWindow()
-    win.show()
-    wait = max(0, 900 - int((time.monotonic() - t0) * 1000))
-    QTimer.singleShot(wait, lambda: splash.finish(win))
-    code = app.exec()
-    lock.unlock()
-    sys.exit(code)
+    guard.listen(win.show_window)
+    if minimized and win.tray:           # inicio con Windows: solo el ícono junto al reloj
+        pass
+    elif minimized:
+        win.showMinimized()
+    else:
+        win.show()
+        wait = max(0, 900 - int((time.monotonic() - t0) * 1000))
+        QTimer.singleShot(wait, lambda: splash.finish(win))
+    sys.exit(app.exec())

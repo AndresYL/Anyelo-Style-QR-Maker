@@ -182,3 +182,104 @@ def test_style_panel_only_on_pages_that_generate(win):
     assert not win.panel_scroll.isHidden()
     win.pages.setCurrentWidget(win.settings_tab)
     assert win.panel_scroll.isHidden()
+
+
+# ---------- v0.4: inicio con Windows y copia única ----------
+
+class _FakeWinreg:
+    HKEY_CURRENT_USER, KEY_READ, KEY_SET_VALUE, REG_SZ = 1, 1, 2, 1
+
+    def __init__(self):
+        self.values = {}
+
+    class _Key:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            return False
+
+    def OpenKey(self, root, path, res, access):
+        return self._Key()
+
+    CreateKeyEx = OpenKey
+
+    def QueryValueEx(self, key, name):
+        if name not in self.values:
+            raise FileNotFoundError(name)
+        return self.values[name], self.REG_SZ
+
+    def SetValueEx(self, key, name, res, typ, value):
+        self.values[name] = value
+
+    def DeleteValue(self, key, name):
+        if name not in self.values:
+            raise FileNotFoundError(name)
+        del self.values[name]
+
+
+@pytest.fixture()
+def fake_windows(monkeypatch):
+    import sys
+    from anyelo_qr import winfx
+    reg = _FakeWinreg()
+    monkeypatch.setitem(sys.modules, "winreg", reg)
+    monkeypatch.setattr(winfx, "IS_WIN", True)
+    monkeypatch.setattr(sys, "frozen", True, raising=False)
+    monkeypatch.setattr(sys, "executable", r"C:\Users\Anyelo\AppData\Local\Programs\Anyelo Style QR\AnyeloStyleQR.exe")
+    return reg
+
+
+def test_autostart_writes_the_minimized_command(fake_windows):
+    from anyelo_qr import winfx
+    assert winfx.autostart_supported() and not winfx.autostart_enabled()
+    assert winfx.set_autostart(True) and winfx.autostart_enabled()
+    cmd = fake_windows.values[winfx.RUN_VALUE]
+    assert cmd.startswith('"C:\\Users\\Anyelo') and cmd.endswith('AnyeloStyleQR.exe" --minimized')
+    assert winfx.set_autostart(False) and not winfx.autostart_enabled()
+    assert winfx.set_autostart(False)                                  # quitarlo dos veces no falla
+
+
+def test_autostart_follows_the_program_when_it_moves(fake_windows, monkeypatch):
+    import sys
+    from anyelo_qr import winfx
+    winfx.set_autostart(True)
+    monkeypatch.setattr(sys, "executable", r"D:\Portable\AnyeloStyleQR.exe")
+    winfx.refresh_autostart_path()
+    assert fake_windows.values[winfx.RUN_VALUE] == '"D:\\Portable\\AnyeloStyleQR.exe" --minimized'
+
+
+def test_autostart_is_off_when_running_from_source(monkeypatch):
+    import sys
+    from anyelo_qr import winfx
+    monkeypatch.delattr(sys, "frozen", raising=False)
+    assert not winfx.autostart_supported()
+    assert winfx.set_autostart(True) is False and winfx.autostart_enabled() is False
+
+
+def test_autostart_checkbox_follows_the_registry(win, fake_windows):
+    from anyelo_qr import winfx
+    winfx.set_autostart(True)
+    from anyelo_qr.gui import SettingsTab
+    tab = SettingsTab(win)
+    assert tab.auto.isEnabled() and tab.auto.isChecked()
+    tab.auto.setChecked(False)
+    assert not winfx.autostart_enabled()
+
+
+def test_second_copy_brings_the_first_to_the_front(app):
+    from anyelo_qr.instance import InstanceGuard
+    import time
+    name = f"AnyeloStyleQR-test-{os.getpid()}"
+    first, second = InstanceGuard(name), InstanceGuard(name)
+    assert not second.notify_running()                                 # todavía no hay nadie abierto
+    shown = []
+    first.listen(lambda: shown.append(1))
+    assert second.notify_running()
+    for _ in range(50):
+        app.processEvents()
+        if shown:
+            break
+        time.sleep(0.02)
+    assert shown
+    first.server.close()

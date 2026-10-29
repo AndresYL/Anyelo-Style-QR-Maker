@@ -2,7 +2,7 @@
 
 Generador y lector de códigos QR para Windows. Funciona sin internet y es de código abierto (MIT).
 
-## Qué hace la versión 0.3
+## Qué hace la versión 0.4
 
 **Diseño.** La interfaz usa el mismo lenguaje de la página de Anyelo Style: negro, hueso, crema, rojo y dorado, la
 tipografía Bricolage Grotesque, el botón rojo con sombra dura, la numeración 01-02-03 y el riel lateral con marcador
@@ -38,14 +38,28 @@ Los ajustes se guardan en `%APPDATA%\AnyeloStyleQR\settings.json`.
 run_dev.bat
 ```
 
-## Crear el .exe
+## Instalarlo (sin Python)
 
-```bat
-build_windows.bat
-```
+El flujo de GitHub (`.github/workflows/build-windows.yml`) arma el programa en un Windows de la nube y lo publica en
+**Releases** con dos archivos:
 
-El resultado queda en `dist\AnyeloStyleQR\`. La primera vez Windows puede mostrar "editor desconocido" porque el
-programa no tiene firma digital; es normal en versiones de prueba.
+- `AnyeloStyleQR-Setup.exe`: instalador. Doble clic, sin permisos de administrador. Crea el acceso en el menú Inicio y
+  ofrece abrir el programa al iniciar Windows, minimizado junto al reloj.
+- `AnyeloStyleQR-Portable.zip`: versión portable. Se descomprime en cualquier carpeta (o en un USB) y se abre
+  `AnyeloStyleQR.exe`, sin instalar nada.
+
+Para generar una versión nueva: pestaña Actions, "Crear programa para Windows", "Run workflow". Tarda unos 5 minutos.
+
+Windows puede mostrar "Windows protegió su PC" porque el programa no tiene firma digital todavía. Pulsa "Más información"
+y "Ejecutar de todas formas".
+
+Para armar el .exe en tu propio computador: `build_windows.bat` (necesita Python 3.12).
+
+## Inicio con Windows
+
+Se activa al instalar (casilla del instalador) o después en Ajustes, "Inicio con Windows". Arranca con `--minimized`: solo
+aparece el ícono junto al reloj y el atajo queda listo. Si abres el programa de nuevo, trae la ventana ya abierta al frente.
+Esta opción solo existe en el programa instalado o portable, no al correr desde el código.
 
 ## Cambiar la marca
 
@@ -61,6 +75,8 @@ anyelo_qr/tabular.py   Excel y CSV
 anyelo_qr/gui.py       ventana principal y pestañas (PySide6)
 anyelo_qr/scanner.py   menú del atajo, región, pantalla completa
 anyelo_qr/hotkey.py    atajo global de Windows
+anyelo_qr/instance.py  una sola copia abierta
+installer/             script del instalador (Inno Setup) e imágenes del asistente
 anyelo_qr/widgets.py   botones, riel, selector de color, tarjetas de paso, grabador de atajo
 anyelo_qr/fonts.py     tipografía Bricolage Grotesque
 anyelo_qr/winfx.py     barra de título oscura y detección de AltGr (Windows)

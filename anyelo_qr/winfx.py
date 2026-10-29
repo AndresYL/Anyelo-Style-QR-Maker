@@ -51,3 +51,67 @@ def altgr_char(vk: int, shift: bool = False) -> str | None:
     except Exception:
         pass
     return None
+
+
+# ---------- inicio con Windows ----------
+
+RUN_KEY = r"Software\Microsoft\Windows\CurrentVersion\Run"
+RUN_VALUE = "AnyeloStyleQR"
+MUTEX_NAME = "AnyeloStyleQR_Mutex"      # el instalador lo usa para saber si el programa está abierto
+_mutex_handle = None
+
+
+def autostart_supported() -> bool:
+    """Solo tiene sentido con el programa instalado (.exe), no al correr desde el código."""
+    return IS_WIN and bool(getattr(sys, "frozen", False))
+
+
+def autostart_command() -> str:
+    return f'"{sys.executable}" --minimized'
+
+
+def autostart_enabled() -> bool:
+    if not autostart_supported():
+        return False
+    try:
+        import winreg
+        with winreg.OpenKey(winreg.HKEY_CURRENT_USER, RUN_KEY, 0, winreg.KEY_READ) as k:
+            winreg.QueryValueEx(k, RUN_VALUE)
+        return True
+    except OSError:
+        return False
+
+
+def set_autostart(on: bool) -> bool:
+    """Activa o quita el inicio con Windows para este usuario (no pide permisos de administrador)."""
+    if not autostart_supported():
+        return False
+    try:
+        import winreg
+        with winreg.CreateKeyEx(winreg.HKEY_CURRENT_USER, RUN_KEY, 0, winreg.KEY_SET_VALUE) as k:
+            if on:
+                winreg.SetValueEx(k, RUN_VALUE, 0, winreg.REG_SZ, autostart_command())
+            else:
+                try:
+                    winreg.DeleteValue(k, RUN_VALUE)
+                except FileNotFoundError:
+                    pass
+        return True
+    except OSError:
+        return False
+
+
+def refresh_autostart_path() -> None:
+    """Si el programa se movió de carpeta, el inicio automático apunta a la ruta nueva."""
+    if autostart_enabled():
+        set_autostart(True)
+
+
+def create_app_mutex() -> None:
+    global _mutex_handle
+    if IS_WIN:
+        try:
+            import ctypes
+            _mutex_handle = ctypes.windll.kernel32.CreateMutexW(None, False, MUTEX_NAME)
+        except Exception:
+            pass
