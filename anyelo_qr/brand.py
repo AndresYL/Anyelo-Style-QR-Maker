@@ -3,7 +3,7 @@ Para cambiar el look de todo el programa, edita solo este archivo."""
 
 APP_NAME = "Anyelo Style QR"
 ORG = "Anyelo Style"
-VERSION = "0.4.0"
+VERSION = "0.4.1"
 
 # --- Paleta de la página ---
 INK = "#070707"        # fondo

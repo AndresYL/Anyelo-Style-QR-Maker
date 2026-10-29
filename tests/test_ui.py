@@ -276,7 +276,7 @@ def test_second_copy_brings_the_first_to_the_front(app):
     shown = []
     first.listen(lambda: shown.append(1))
     assert second.notify_running()
-    for _ in range(50):
+    for _ in range(150):                                               # hasta ~3 s: en Windows el canal es más lento
         app.processEvents()
         if shown:
             break
