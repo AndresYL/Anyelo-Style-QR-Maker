@@ -61,6 +61,11 @@ Se activa al instalar (casilla del instalador) o después en Ajustes, "Inicio co
 aparece el ícono junto al reloj y el atajo queda listo. Si abres el programa de nuevo, trae la ventana ya abierta al frente.
 Esta opción solo existe en el programa instalado o portable, no al correr desde el código.
 
+## Página de descarga
+
+En `web/` está la página para publicar el programa en anyelo.style, con sus instrucciones en `web/LEEME.md`. Se actualiza
+sola con cada versión nueva: solo hay que sumar una sección a `CHANGELOG.md`.
+
 ## Cambiar la marca
 
 Colores y nombre: `anyelo_qr/brand.py`. Logo: `anyelo_qr/assets/logo.png` (PNG con fondo transparente; si es blanco

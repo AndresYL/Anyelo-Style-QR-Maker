@@ -1,0 +1,875 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Anyelo Style QR — generador de QR gratis para Windows</title>
+<style>
+/* ============================================================
+   Anyelo Style QR · página de descarga (Anyelo Style)
+   La versión, la fecha, el peso de los archivos y las novedades salen solos de GitHub.
+   Si GitHub no responde, usa los valores de respaldo del script.
+   ============================================================ */
+:root{
+  --bg:#050505;--panel:#101010;--panel2:#161616;--line:#242424;--line2:#343434;
+  --cream:#EBE5CE;--dim:#cfc8b0;--muted:#9a9184;--gold:#d4af37;--ok:#8fd19e;--bad:#ff8a73;--warn:#eac36b;
+  --font:'Bricolage Grotesque',system-ui,-apple-system,'Segoe UI',sans-serif;
+  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  --pad:clamp(18px,5vw,64px);
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--cream);font-family:var(--font);font-optical-sizing:auto;-webkit-font-smoothing:antialiased;overflow-anchor:none}
+body{font-size:17px;line-height:1.55;overflow-x:hidden}
+a{color:inherit}
+.esc{max-width:1440px;margin:0 auto;padding:0 var(--pad) 40px}
+h2,h3,h4{margin:0;font-weight:800;letter-spacing:-.04em;line-height:1}
+p{margin:0}
+code{font-family:var(--mono);font-size:.88em}
+.k{font-size:14px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--gold);margin-bottom:14px}
+.muted{color:var(--muted)}
+.sec{padding:clamp(70px,11vw,150px) 0 0}
+.sec-h{font-size:clamp(34px,6vw,76px);max-width:16ch}
+.sec-p{font-size:clamp(17px,1.6vw,20px);color:var(--dim);max-width:60ch;margin-top:20px}
+.btn{display:inline-flex;align-items:center;gap:10px;font:inherit;font-weight:700;font-size:16px;padding:16px 26px;border-radius:99px;border:1px solid transparent;cursor:pointer;text-decoration:none;transition:background .25s,color .25s,border-color .25s,transform .2s}
+.btn:active{transform:scale(.97)}
+.btn-p{background:var(--cream);color:#050505}
+.btn-p:hover{background:var(--gold)}
+.btn-g{border-color:var(--line2);color:var(--cream);background:none}
+.btn-g:hover{border-color:var(--cream)}
+.btn svg{width:18px;height:18px}
+.btn[disabled]{opacity:.4;cursor:not-allowed}
+.btn:focus-visible,.opt:focus-visible,.sw:focus-visible,summary:focus-visible{outline:2px solid var(--gold);outline-offset:3px}
+.chip{font-size:14px;font-weight:600;padding:7px 14px;border-radius:99px;border:1px solid var(--line2);color:var(--dim)}
+.cta{display:flex;flex-wrap:wrap;gap:12px;align-items:center}
+.rv{opacity:0;transform:translateY(26px);transition:opacity .9s cubic-bezier(.2,.9,.2,1),transform .9s cubic-bezier(.2,.9,.2,1)}
+.rv.in{opacity:1;transform:none}
+.rv.d1{transition-delay:.08s}.rv.d2{transition-delay:.16s}.rv.d3{transition-delay:.24s}
+.kbd{display:inline-block;font-family:var(--mono);font-size:.85em;padding:2px 9px;border:1px solid var(--line2);border-bottom-width:3px;border-radius:8px;background:var(--panel2);color:var(--cream)}
+
+/* ---------- HERO ---------- */
+.hero{padding:clamp(40px,7vw,90px) 0 0;display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);gap:clamp(30px,5vw,80px);align-items:center}
+.hero h2{font-size:clamp(50px,8.4vw,120px);line-height:.88;letter-spacing:-.055em}
+.hero h2 em{font-style:normal;color:var(--gold)}
+.lead{font-size:clamp(18px,1.9vw,23px);color:var(--dim);max-width:34ch;margin:26px 0 32px}
+.meta{display:flex;flex-wrap:wrap;gap:8px;margin-top:22px}
+.vault{position:relative;width:100%;max-width:480px;aspect-ratio:1;justify-self:center}
+.vault svg{width:100%;height:100%;overflow:visible}
+.vault .r{fill:none;stroke:var(--line2)}
+.vault .sweep{fill:none;stroke:var(--gold);stroke-width:3;stroke-linecap:round;transform-origin:200px 200px;transform:rotate(-90deg);animation:spin 9s linear infinite}
+@keyframes spin{to{transform:rotate(270deg)}}
+.vault .ticks line{stroke:var(--line2);stroke-width:2}
+.vault text{font-family:var(--mono);fill:var(--cream);font-weight:600}
+.vault .lbl{font-family:var(--font);font-size:15px;fill:var(--muted);letter-spacing:.12em;font-weight:700}
+#heroqr{transition:opacity .3s}
+
+/* ---------- DEMO ---------- */
+.demo{margin-top:46px;display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,.9fr);gap:18px}
+.card{background:linear-gradient(160deg,#141414,#0c0c0c);border:1px solid var(--line2);border-radius:26px;padding:clamp(22px,3vw,40px);position:relative;overflow:hidden}
+.card h4{font-size:24px;margin-bottom:6px}
+.card .sub{color:var(--muted);font-size:15px;margin-bottom:22px}
+.lbl2{display:block;font-size:14px;font-weight:700;color:var(--muted);margin:0 0 8px}
+.fld{width:100%;background:var(--panel2);border:1px solid var(--line2);border-radius:14px;color:var(--cream);font:inherit;font-size:17px;padding:14px 16px;margin-bottom:18px;outline:0;transition:border-color .2s,box-shadow .2s}
+.fld:focus{border-color:var(--gold);box-shadow:0 0 0 3px rgba(212,175,55,.15)}
+.row2{margin-bottom:18px}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.opt{font:inherit;font-size:14px;font-weight:600;padding:9px 16px;border-radius:99px;border:1px solid var(--line2);color:var(--dim);background:none;cursor:pointer;transition:background .2s,color .2s,border-color .2s}
+.opt:hover{border-color:var(--cream);color:var(--cream)}
+.opt[aria-pressed="true"]{background:var(--cream);border-color:var(--cream);color:#050505}
+.sws{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.sw{width:34px;height:34px;border-radius:50%;border:2px solid var(--line2);cursor:pointer;padding:0;transition:box-shadow .2s,border-color .2s}
+.sw[aria-pressed="true"]{border-color:var(--gold);box-shadow:0 0 0 3px rgba(212,175,55,.28)}
+.sticker{background:#faedd3;border-radius:24px;padding:18px;box-shadow:0 30px 70px rgba(0,0,0,.6);width:100%;max-width:340px;margin:0 auto}
+.sticker svg{display:block;width:100%;height:auto;border-radius:10px}
+.preview{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;min-height:100%}
+.badge{display:inline-flex;align-items:center;gap:8px;font-size:13px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--ok)}
+.badge i{width:8px;height:8px;border-radius:50%;background:var(--gold)}
+.badge.bad{color:var(--bad)}.badge.bad i{background:var(--bad)}
+.hint{font-size:14px;color:var(--muted);text-align:center;max-width:34ch}
+.msg{margin-top:6px;font-size:14px;color:var(--bad);display:none}
+.msg.show{display:block}
+
+/* ---------- 3 FORMAS ---------- */
+.ways{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin-top:46px}
+.way{background:var(--panel);border:1px solid var(--line);border-radius:24px;padding:28px;display:flex;flex-direction:column;gap:12px;min-height:330px}
+.way h3{font-size:clamp(24px,2.6vw,32px)}
+.way p{color:var(--muted);font-size:16px}
+.way .art{margin-top:auto}
+.arow{font-family:var(--mono);font-size:13px;margin-bottom:12px}
+.arow>span{display:block;padding:7px 10px;border-radius:10px;border:1px dashed var(--line2);color:var(--dim);overflow-wrap:anywhere}
+.arow .to{display:flex;align-items:center;gap:8px;margin-top:6px;padding-left:14px}
+.arow .to b{font-weight:400;color:var(--gold)}
+.arow .to span{padding:6px 10px;border-radius:10px;border:1px solid var(--line2);color:var(--cream);background:var(--panel2);overflow-wrap:anywhere}
+.tbl{display:grid;grid-template-columns:1fr 1.5fr;gap:6px;font-family:var(--mono);font-size:13px}
+.tbl span{padding:8px 10px;border-radius:10px;border:1px dashed var(--line2);color:var(--dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tbl span.h{border-style:solid;color:var(--gold);background:var(--panel2);font-family:var(--font);font-weight:700;letter-spacing:.06em;font-size:12px}
+.urlart{font-family:var(--mono);font-size:13px;line-height:1.7;padding:14px;border-radius:14px;border:1px dashed var(--line2);color:var(--dim);overflow-wrap:anywhere}
+.urlart b{font-weight:400;color:var(--gold)}
+
+/* ---------- LEER PANTALLA ---------- */
+.role{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.15fr);gap:clamp(30px,5vw,70px);align-items:center;margin-top:50px}
+.role .sec-h,.role .sec-p{margin-top:0}
+.role .sec-p{margin-top:20px}
+.lock-screen{background:var(--panel);border:1px solid var(--line);border-radius:24px;overflow:hidden}
+.ls-top{display:flex;gap:6px;padding:12px 16px;border-bottom:1px solid var(--line)}
+.ls-top i{width:10px;height:10px;border-radius:50%;background:var(--line2)}
+.lock-screen img{display:block;width:100%;height:auto;background:#0b0b0b;min-height:120px}
+
+/* ---------- GALERÍA ---------- */
+.tabs{display:flex;flex-wrap:wrap;gap:8px;margin-top:36px}
+.gal{margin-top:24px;max-width:1100px}
+.gal .cap{margin-top:22px;max-width:62ch}
+.gal .cap h4{font-size:24px;margin-bottom:8px}
+.gal .cap p{color:var(--dim);font-size:17px}
+.js .gpanel{display:none}
+.js .gpanel.on{display:block}
+
+/* ---------- LO QUE TRAE ---------- */
+.grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:1px;background:var(--line);border:1px solid var(--line);border-radius:24px;overflow:hidden;margin-top:50px}
+.cell{background:var(--bg);padding:26px;transition:background .3s}
+.cell:hover{background:var(--panel)}
+.cell h4{font-size:20px;letter-spacing:-.03em;margin-bottom:8px}
+.cell p{color:var(--muted);font-size:15px}
+.cell .door-state{display:inline-block;font-size:12px;font-weight:700;letter-spacing:.08em;color:var(--ok);border:1px solid #24432b;border-radius:99px;padding:3px 10px;margin-bottom:14px}
+
+/* ---------- ANTES DE ABRIR ---------- */
+.slug{margin-top:46px;background:var(--panel);border:1px solid var(--line);border-radius:26px;padding:clamp(22px,3vw,40px)}
+.url{display:flex;align-items:center;gap:12px;flex-wrap:wrap;font-size:clamp(17px,2vw,24px);font-weight:700;padding:16px 0;border-top:1px solid var(--line)}
+.url:first-of-type{border-top:0}
+.url code{font-family:var(--mono);font-size:.82em;padding:6px 10px;border-radius:10px;background:var(--panel2);color:var(--dim);word-break:break-all}
+.url .arr{color:var(--gold)}
+.url .pill{font-family:var(--font);font-size:13px;font-weight:700;padding:4px 11px;border-radius:99px;border:1px solid}
+.pill.ok{color:var(--ok);border-color:#24432b}
+.pill.bad{color:var(--bad);border-color:#5a2a22}
+
+/* ---------- SI ALGO SALE MAL ---------- */
+.rescue{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin-top:40px}
+.res{border:1px solid var(--line2);border-radius:20px;padding:24px}
+.res b{font-size:13px;color:var(--gold);letter-spacing:.1em}
+.res h4{font-size:22px;margin:8px 0 8px}
+.res p{font-size:15px;color:var(--muted)}
+.res code{display:block;margin-top:12px;padding:12px;border-radius:12px;background:var(--panel2);color:var(--cream);word-break:break-all}
+
+/* ---------- INSTALAR / NOVEDADES / PREGUNTAS / CIERRE ---------- */
+.install{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin-top:40px}
+.ins{border-radius:22px;padding:26px;background:var(--panel);border:1px solid var(--line)}
+.ins i{font-style:normal;font-size:52px;font-weight:800;letter-spacing:-.06em;color:var(--gold);display:block;line-height:1;margin-bottom:14px}
+.ins h4{font-size:21px;margin-bottom:8px}
+.ins p{font-size:15px;color:var(--muted)}
+.install-cta{margin-top:26px}
+.news{margin-top:40px;max-width:860px}
+.news .when{font-size:14px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--gold);margin-bottom:14px}
+.news ul{margin:0 0 0 20px;padding:0;color:var(--dim);font-size:17px}
+.news li{margin-bottom:8px}
+.old{margin-top:22px;max-width:860px}
+.old[hidden]{display:none}
+.old .row{padding:18px 0;border-top:1px solid var(--line)}
+.old h4{font-size:19px;letter-spacing:-.02em;margin-bottom:8px}
+.old h4 span{font-weight:500;font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-left:10px}
+.old ul{margin:0 0 0 20px;padding:0;color:var(--muted);font-size:16px}
+.old li{margin-bottom:4px}
+.morebtn{margin-top:18px}
+.faq{margin-top:40px;border-top:1px solid var(--line)}
+.faq details{border-bottom:1px solid var(--line)}
+.faq summary{list-style:none;cursor:pointer;display:flex;justify-content:space-between;gap:20px;align-items:center;padding:24px 0;font-size:clamp(18px,2vw,23px);font-weight:700;letter-spacing:-.025em}
+.faq summary::-webkit-details-marker{display:none}
+.faq summary::after{content:"+";flex:none;width:34px;height:34px;border-radius:50%;border:1px solid var(--line2);display:grid;place-items:center;color:var(--gold);font-weight:500;transition:transform .3s}
+.faq details[open] summary::after{transform:rotate(45deg)}
+.faq details p{color:var(--dim);padding:0 0 26px;max-width:72ch;font-size:16px}
+.final{margin-top:clamp(70px,11vw,150px);text-align:center;padding:clamp(40px,7vw,90px) 20px;border-radius:30px;border:1px solid #4a3c12;background:radial-gradient(90% 120% at 50% 0,rgba(212,175,55,.18),transparent 60%),var(--panel)}
+.final h2{font-size:clamp(40px,7vw,96px);letter-spacing:-.05em}
+.final p{color:var(--dim);margin:20px auto 30px;max-width:46ch;font-size:18px}
+.final .cta{justify-content:center}
+.final p.small{margin:18px auto 0}
+.small{font-size:14px;color:var(--muted);margin-top:18px}
+.small a{text-underline-offset:3px}
+
+@media (max-width:980px){
+  .hero,.demo,.role{grid-template-columns:1fr}
+  .vault{max-width:380px}
+  .ways,.rescue,.install{grid-template-columns:1fr}
+  .grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .way{min-height:0}
+}
+@media (max-width:620px){
+  .grid{grid-template-columns:1fr}
+}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}.rv{opacity:1;transform:none}}
+</style>
+<link rel="stylesheet" href="../assets/tools.css">
+</head>
+<body>
+<div class="esc" id="esc">
+
+  <!-- ===== HERO ===== -->
+  <section class="hero">
+    <div>
+      <p class="k rv">Programa gratis para Windows</p>
+      <h2 class="rv d1">Tus QR, <em>con tu estilo.</em></h2>
+      <p class="lead rv d2">Pega tus links, elige cómo se ven y llévate cien códigos en una carpeta. Funciona sin internet y sin cuentas que crear.</p>
+      <div class="cta rv d3">
+        <a class="btn btn-p" data-dl="inst" href="#" target="_top" rel="noopener">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11"/><path d="M7 10l5 5 5-5"/><path d="M5 20h14"/></svg>
+          Descargar gratis
+        </a>
+        <a class="btn btn-g" href="#demo">Hazle un QR a tu link</a>
+      </div>
+      <div class="meta rv d3"><span class="chip" data-ver>Versión {{VERSION}}</span><span class="chip">Windows 10 y 11</span><span class="chip">Código abierto</span><span class="chip">Sin internet</span></div>
+    </div>
+    <div class="vault rv d2" aria-hidden="true">
+      <svg viewBox="0 0 400 400">
+        <circle class="r" cx="200" cy="200" r="190"/>
+        <g class="ticks" id="ticks"></g>
+        <circle class="r" cx="200" cy="200" r="150"/>
+        <circle class="sweep" cx="200" cy="200" r="150" stroke-dasharray="190 752.48"/>
+        <text x="200" y="76" text-anchor="middle" class="lbl">TU QR</text>
+        <rect x="100" y="96" width="200" height="200" rx="22" fill="#FAEDD3"/>
+        <svg id="heroqr" x="108" y="104" width="184" height="184" viewBox="0 0 33 33"></svg>
+        <text x="200" y="326" text-anchor="middle" class="lbl" id="heroname">REDONDEADOS</text>
+      </svg>
+    </div>
+  </section>
+
+  <!-- ===== DEMO ===== -->
+  <section class="sec" id="demo">
+    <p class="k rv">Pruébalo aquí</p>
+    <h3 class="sec-h rv d1">Hazle un QR a tu link.</h3>
+    <p class="sec-p rv d2">Escribe un link y cambia la forma, los colores y el logo. Esto mismo hace el programa, pero con cien links a la vez, desde un Excel, y leyendo cada código de vuelta para confirmar que escanea.</p>
+    <div class="demo">
+      <div class="card rv">
+        <h4>Tu QR</h4>
+        <p class="sub">Cambia lo que quieras. Se ve al instante.</p>
+        <label class="lbl2" for="lk">Tu link</label>
+        <input class="fld" id="lk" value="https://anyelo.style" maxlength="300" autocomplete="off" spellcheck="false" inputmode="url">
+        <div class="row2"><span class="lbl2">Cuadritos</span><div class="chips" id="g-shape">
+          <button class="opt" type="button" data-v="square" aria-pressed="false">Cuadrados</button>
+          <button class="opt" type="button" data-v="rounded" aria-pressed="true">Redondeados</button>
+          <button class="opt" type="button" data-v="dots" aria-pressed="false">Puntos</button>
+          <button class="opt" type="button" data-v="vbars" aria-pressed="false">Barras ↕</button>
+          <button class="opt" type="button" data-v="hbars" aria-pressed="false">Barras ↔</button>
+        </div></div>
+        <div class="row2"><span class="lbl2">Ojos</span><div class="chips" id="g-eye">
+          <button class="opt" type="button" data-v="square" aria-pressed="false">Cuadrados</button>
+          <button class="opt" type="button" data-v="rounded" aria-pressed="false">Redondeados</button>
+          <button class="opt" type="button" data-v="circle" aria-pressed="true">Círculos</button>
+        </div></div>
+        <div class="row2"><span class="lbl2">Color del código</span><div class="sws" id="g-fg">
+          <button class="sw" type="button" data-v="#070707" style="background:#070707" aria-label="Negro" aria-pressed="true"></button>
+          <button class="sw" type="button" data-v="#A93226" style="background:#A93226" aria-label="Rojo" aria-pressed="false"></button>
+          <button class="sw" type="button" data-v="#1B2A6B" style="background:#1B2A6B" aria-label="Azul" aria-pressed="false"></button>
+          <button class="sw" type="button" data-v="#0B3D2E" style="background:#0B3D2E" aria-label="Verde" aria-pressed="false"></button>
+          <button class="sw" type="button" data-v="#5B2A86" style="background:#5B2A86" aria-label="Violeta" aria-pressed="false"></button>
+        </div></div>
+        <div class="row2"><span class="lbl2">Fondo</span><div class="sws" id="g-bg">
+          <button class="sw" type="button" data-v="#FAEDD3" style="background:#FAEDD3" aria-label="Crema" aria-pressed="true"></button>
+          <button class="sw" type="button" data-v="#FFFFFF" style="background:#FFFFFF" aria-label="Blanco" aria-pressed="false"></button>
+          <button class="sw" type="button" data-v="#EBE5CE" style="background:#EBE5CE" aria-label="Hueso" aria-pressed="false"></button>
+        </div></div>
+        <div class="row2" style="margin-bottom:0"><span class="lbl2">Logo en el centro</span><div class="chips" id="g-logo">
+          <button class="opt" type="button" data-v="0" aria-pressed="true">Sin logo</button>
+          <button class="opt" type="button" data-v="1" aria-pressed="false">Anyelo Style</button>
+        </div></div>
+      </div>
+      <div class="card rv d1">
+        <div class="preview">
+          <div class="sticker" id="sticker" role="img" aria-label="Vista previa del código QR"></div>
+          <span class="badge" id="badge"><i></i><span id="badgetxt">Contraste bueno</span></span>
+          <p class="msg" id="msg" role="status"></p>
+          <div class="cta" style="justify-content:center">
+            <button class="btn btn-p" id="savePng" type="button">Guardar PNG</button>
+            <button class="btn btn-g" id="saveSvg" type="button">Guardar SVG</button>
+          </div>
+          <p class="hint">El SVG sirve para imprimir sin perder calidad. En el programa haces cien así, de una vez.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== 3 FORMAS ===== -->
+  <section class="sec">
+    <p class="k rv">Tres formas de empezar</p>
+    <h3 class="sec-h rv d1">Parte de donde estés.</h3>
+    <div class="ways">
+      <article class="way rv">
+        <h3>Una lista de links</h3>
+        <p>Pegas los links, uno por línea. Con «Nombre | link» eliges cómo se llama cada archivo. Los repetidos se saltan y nunca pisa lo que ya tenías.</p>
+        <div class="art">
+          <div class="arow"><span>Promo | anyelo.style/promo</span><div class="to"><b>→</b><span>Promo.png</span></div></div>
+          <div class="arow"><span>Libro | anyelo.style/libro</span><div class="to"><b>→</b><span>Libro.png</span></div></div>
+          <div class="arow"><span>anyelo.style/musica</span><div class="to"><b>→</b><span>anyelo.style_musica.png</span></div></div>
+        </div>
+      </article>
+      <article class="way rv d1">
+        <h3>Tu Excel</h3>
+        <p>Cargas el .xlsx o el .csv y eliges qué columna es el nombre y cuál es el link. Sale un QR por fila. Si tu lista vive en Google Sheets, la bajas como CSV.</p>
+        <div class="art tbl"><span class="h">NOMBRE</span><span class="h">LINK</span><span>Instagram</span><span>anyelo.style/ig</span><span>Música nueva</span><span>anyelo.style/musica</span><span>Libro</span><span>anyelo.style/libro</span></div>
+      </article>
+      <article class="way rv d2">
+        <h3>Un link con rastro</h3>
+        <p>Armas el link con fuente, medio y campaña y lo mandas a tu lista. Después sabes en Google Analytics si la visita vino del sticker, del post o del correo.</p>
+        <div class="art urlart">anyelo.style/musica<b>?utm_source=</b>instagram<b>&amp;utm_medium=</b>social<b>&amp;utm_campaign=</b>otono</div>
+      </article>
+    </div>
+  </section>
+
+  <!-- ===== LEER LA PANTALLA ===== -->
+  <section class="sec">
+    <div class="role">
+      <div>
+        <p class="k rv">Lee lo que veas</p>
+        <h3 class="sec-h rv d1">Cualquier QR de tu pantalla.</h3>
+        <p class="sec-p rv d2">Presionas tu atajo de teclado (lo eliges tú, por ejemplo <span class="kbd">Ctrl</span> <span class="kbd">Alt</span> <span class="kbd">Q</span>), marcas el QR que ves en un video, un PDF o una llamada, y el programa te dice a dónde lleva antes de abrirlo. También lee una imagen o toda la pantalla.</p>
+      </div>
+      <div class="lock-screen rv d1">
+        <div class="ls-top"><i></i><i></i><i></i></div>
+        <img data-shot="atajo" alt="El menú del atajo sobre un QR en pantalla" width="1280" height="600">
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== GALERÍA ===== -->
+  <section class="sec" id="galeria">
+    <p class="k rv">Por dentro</p>
+    <h3 class="sec-h rv d1">Así se ve trabajando.</h3>
+    <div class="tabs rv d2" role="group" aria-label="Pantallas del programa" id="tabs">
+      <button class="opt" type="button" data-tab="generar" aria-pressed="true">Generar</button>
+      <button class="opt" type="button" data-tab="excel" aria-pressed="false">Excel</button>
+      <button class="opt" type="button" data-tab="utm" aria-pressed="false">UTM</button>
+      <button class="opt" type="button" data-tab="resultado" aria-pressed="false">Resultado</button>
+      <button class="opt" type="button" data-tab="ajustes" aria-pressed="false">Ajustes</button>
+    </div>
+    <div class="gal rv d2" id="gal">
+      <div class="gpanel on" data-panel="generar">
+        <div class="lock-screen"><div class="ls-top"><i></i><i></i><i></i></div><img data-shot="generar" alt="Pantalla Generar: la lista de links, el destino y la vista previa" width="1280" height="912"></div>
+        <div class="cap"><h4>Generar</h4><p>Pegas los links, eliges la carpeta y generas. A la derecha ves el QR en vivo y si se lee bien.</p></div>
+      </div>
+      <div class="gpanel" data-panel="excel">
+        <div class="lock-screen"><div class="ls-top"><i></i><i></i><i></i></div><img data-shot="excel" alt="Pantalla Excel y CSV" width="1280" height="912"></div>
+        <div class="cap"><h4>Excel y CSV</h4><p>Cargas tu lista y eliges qué columna es el nombre y cuál es el link. Un QR por fila.</p></div>
+      </div>
+      <div class="gpanel" data-panel="utm">
+        <div class="lock-screen"><div class="ls-top"><i></i><i></i><i></i></div><img data-shot="utm" alt="Pantalla del constructor de UTM" width="1280" height="912"></div>
+        <div class="cap"><h4>UTM</h4><p>Armas el link con su rastro y lo mandas a tu lista de QR con un clic.</p></div>
+      </div>
+      <div class="gpanel" data-panel="resultado">
+        <div class="lock-screen"><div class="ls-top"><i></i><i></i><i></i></div><img data-shot="resultado" alt="Resultado de un escaneo con avisos de seguridad" width="680" height="572" style="max-width:640px;margin:0 auto"></div>
+        <div class="cap"><h4>Antes de abrir</h4><p>Te muestra a dónde lleva el QR y te avisa si el link está acortado, sin cifrar o se ve raro.</p></div>
+      </div>
+      <div class="gpanel" data-panel="ajustes">
+        <div class="lock-screen"><div class="ls-top"><i></i><i></i><i></i></div><img data-shot="ajustes" alt="Pantalla de ajustes: atajo, inicio con Windows y opciones" width="1280" height="912"></div>
+        <div class="cap"><h4>Ajustes</h4><p>Cambias el atajo grabando la combinación, activas el inicio con Windows y eliges cómo se generan los archivos.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== LO QUE TRAE ===== -->
+  <section class="sec">
+    <p class="k rv">Lo que trae</p>
+    <h3 class="sec-h rv d1">Incluido desde que lo instalas.</h3>
+    <p class="sec-p rv d2">Todo viene activado y se ajusta desde la ventana, sin tocar nada raro.</p>
+    <div class="grid rv d2">
+      <div class="cell"><span class="door-state">INCLUIDO</span><h4>Lotes</h4><p>Cien links de una vez, con nombres propios y sin pisar archivos que ya tenías.</p></div>
+      <div class="cell"><span class="door-state">INCLUIDO</span><h4>Excel y CSV</h4><p>Un QR por fila. Tú eliges la columna del nombre y la del link.</p></div>
+      <div class="cell"><span class="door-state">INCLUIDO</span><h4>Cinco formas</h4><p>Cuadrados, redondeados, puntos y dos tipos de barras.</p></div>
+      <div class="cell"><span class="door-state">INCLUIDO</span><h4>Ojos a tu gusto</h4><p>Cuadrados, redondeados o círculos, con un color propio si quieres.</p></div>
+      <div class="cell"><span class="door-state">INCLUIDO</span><h4>Tu logo en el centro</h4><p>El de Anyelo Style o el tuyo, con borde o sin él. La corrección de errores sube sola.</p></div>
+      <div class="cell"><span class="door-state">INCLUIDO</span><h4>Tamaño exacto</h4><p>Escribes los píxeles y el QR sale cuadrado y de esa medida. En PNG, SVG o PDF.</p></div>
+      <div class="cell"><span class="door-state">INCLUIDO</span><h4>Se lee de vuelta</h4><p>Cada QR se escanea al crearlo. Si un diseño no se lee, el programa te avisa.</p></div>
+      <div class="cell"><span class="door-state">INCLUIDO</span><h4>Avisos de seguridad</h4><p>Detecta acortadores, links sin cifrar y dominios que imitan a otros.</p></div>
+      <div class="cell"><span class="door-state" style="color:var(--gold);border-color:#4a3c12">OPCIONAL</span><h4>Inicio con Windows</h4><p>Se abre minimizado junto al reloj para que el atajo ya esté listo cuando prendes el computador.</p></div>
+    </div>
+  </section>
+
+  <!-- ===== ANTES DE ABRIR ===== -->
+  <section class="sec">
+    <p class="k rv">Antes de abrir</p>
+    <h3 class="sec-h rv d1">Mira a dónde lleva.</h3>
+    <p class="sec-p rv d2">Un QR es una caja cerrada. El programa la abre por ti y te enseña el link completo antes de que lo toques, con un aviso si algo se ve raro.</p>
+    <div class="slug rv d2">
+      <div class="url"><code>bit.ly/3xZ9kQ</code><span class="arr">→</span><span>destino oculto</span><span class="pill bad">acortador</span></div>
+      <div class="url"><code>http://192.168.1.5/login</code><span class="arr">→</span><span>sin cifrar</span><span class="pill bad">dirección IP, no un dominio</span></div>
+      <div class="url"><code>anyelo.style/musica</code><span class="arr">→</span><span>un link normal</span><span class="pill ok">listo para abrir</span></div>
+    </div>
+  </section>
+
+  <!-- ===== SI ALGO SALE MAL ===== -->
+  <section class="sec">
+    <p class="k rv">Si algo sale mal</p>
+    <h3 class="sec-h rv d1">El aviso azul de Windows.</h3>
+    <p class="sec-p rv d2">Aparece con cualquier programa nuevo que todavía no tiene firma digital. El código es abierto y cualquiera puede revisarlo.</p>
+    <div class="rescue">
+      <div class="res rv"><b>PASO 1</b><h4>Pulsa «Más información»</h4><p>Es el enlace pequeño, debajo del mensaje «Windows protegió su PC».</p></div>
+      <div class="res rv d1"><b>PASO 2</b><h4>Pulsa «Ejecutar de todas formas»</h4><p>Aparece después del primer paso. Con eso se abre el asistente de instalación.</p></div>
+      <div class="res rv d2"><b>SI DUDAS</b><h4>Revisa el código</h4><p>Está completo en GitHub. También puedes subir el instalador a virustotal.com antes de abrirlo.<code data-repo-text>github.com/{{REPO}}</code></p></div>
+    </div>
+  </section>
+
+  <!-- ===== INSTALAR ===== -->
+  <section class="sec" id="descarga">
+    <p class="k rv">Instalarlo</p>
+    <h3 class="sec-h rv d1">Tres pasos.</h3>
+    <div class="install">
+      <div class="ins rv"><i>01</i><h4>Descarga el instalador</h4><p>Con el botón de abajo. <span data-size-inst-txt>Pesa unos pocos MB.</span></p></div>
+      <div class="ins rv d1"><i>02</i><h4>Ábrelo y sigue el asistente</h4><p>Doble clic. No pide permisos de administrador y te deja elegir si se abre con Windows.</p></div>
+      <div class="ins rv d2"><i>03</i><h4>Pega tus links</h4><p>Elige la carpeta, genera y listo. Si no puedes instalar programas, usa el portable: un zip que corre desde cualquier carpeta.</p></div>
+    </div>
+    <div class="cta install-cta rv d2">
+      <a class="btn btn-p" data-dl="inst" href="#" target="_top" rel="noopener">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11"/><path d="M7 10l5 5 5-5"/><path d="M5 20h14"/></svg>
+        Descargar instalador <span class="muted" data-size-inst></span>
+      </a>
+      <a class="btn btn-g" data-dl="port" href="#" target="_top" rel="noopener">Versión portable (.zip) <span class="muted" data-size-port></span></a>
+    </div>
+  </section>
+
+  <!-- ===== NOVEDADES ===== -->
+  <section class="sec">
+    <p class="k rv">Novedades</p>
+    <h3 class="sec-h rv d1">Versión <span style="color:var(--gold)" data-vnum>{{VERSION}}</span></h3>
+    <div class="card news rv d2">
+      <div class="when" data-fecha-linea>{{FECHA}}</div>
+      <ul id="news-latest"></ul>
+    </div>
+    <button class="btn btn-g morebtn" id="moreBtn" type="button" hidden>Ver versiones anteriores</button>
+    <div class="old" id="news-old" hidden></div>
+  </section>
+
+  <!-- ===== PREGUNTAS ===== -->
+  <section class="sec">
+    <p class="k rv">Preguntas</p>
+    <h3 class="sec-h rv d1">Lo que la gente pregunta.</h3>
+    <div class="faq rv d2">
+      <details open><summary>¿Es gratis?</summary><p>Sí. No pide cuenta, no limita la cantidad de QR y no les pone marca de agua. Es código abierto con licencia MIT: puedes usarlo también en trabajos con clientes.</p></details>
+      <details><summary>¿Necesita internet?</summary><p>Para nada. Generar, leer, guardar y copiar ocurre en tu computador. Solo usas internet si decides abrir un link que leíste.</p></details>
+      <details><summary>¿Los QR vencen o dependen de alguien?</summary><p>Son estáticos: el link queda guardado dentro del dibujo. No caducan ni dependen de ningún servidor. La otra cara es que, si cambias el destino, hay que hacer un QR nuevo.</p></details>
+      <details><summary>¿Funciona en Mac o en el celular?</summary><p>Por ahora solo en Windows 10 y 11 de 64 bits.</p></details>
+      <details><summary>¿Puedo poner mi propio logo?</summary><p>Sí. Eliges cualquier imagen PNG, JPG o WebP (mejor si tiene fondo transparente), con borde o sin borde. El programa sube solo el nivel de corrección de errores para que el código siga leyéndose.</p></details>
+      <details><summary>¿Mi antivirus lo marca?</summary><p>Algunos antivirus desconfían de programas nuevos sin firma. Si te pasa, revisa el código en GitHub o sube el archivo a virustotal.com antes de abrirlo.</p></details>
+      <details><summary>¿Cómo lo actualizo y cómo lo quito?</summary><p>Para actualizar, descargas el instalador nuevo y lo ejecutas encima: conserva tus ajustes. Para quitarlo: Configuración, Aplicaciones, Anyelo Style QR, Desinstalar. Si usas el portable, borras la carpeta.</p></details>
+      <details><summary>¿Manda mis datos a algún lado?</summary><p>No. El programa trabaja dentro de tu computador: no hay cuentas, ni servicios externos, ni rastreo. Tus links no salen de ahí.</p></details>
+    </div>
+  </section>
+
+  <!-- ===== CIERRE ===== -->
+  <section class="final rv">
+    <h2>Hazlos con<br>tu estilo.</h2>
+    <p>Descárgalo y pruébalo cinco minutos. Si no te sirve, lo quitas desde Configuración. No pide cuenta, ni correo, ni tarjeta.</p>
+    <div class="cta">
+      <a class="btn btn-p" data-dl="inst" href="#" target="_top" rel="noopener">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11"/><path d="M7 10l5 5 5-5"/><path d="M5 20h14"/></svg>
+        Descargar Anyelo Style QR
+      </a>
+    </div>
+    <p class="small"><span data-ver-line>Versión {{VERSION}} · Gratis · Licencia MIT</span> · <a data-repo href="#" target="_top" rel="noopener">Código en GitHub</a> · Hecho por Anyelo Style</p>
+  </section>
+
+</div>
+
+<script type="text/javascript">
+{{QRLIB}}
+</script>
+<script type="text/javascript">
+(function () {
+  /* ====== PROGRAMA ======
+     REPO = usuario/repositorio de GitHub (debe ser público). Los botones bajan siempre "la última versión".
+     La versión, la fecha, el peso y las novedades llegan solos desde GitHub (releases y CHANGELOG.md).
+     Si GitHub no responde, se usan los valores de respaldo de aquí abajo.
+     IMG = de dónde salen las capturas de pantalla (la carpeta web/shots del repositorio). */
+  var REPO = '{{REPO}}';
+  var RAMA = 'main';
+  var INSTALADOR = 'AnyeloStyleQR-Setup.exe';
+  var PORTABLE = 'AnyeloStyleQR-Portable.zip';
+  var URL_INSTALADOR = '';
+  var URL_PORTABLE = '';
+  var IMG = 'https://raw.githubusercontent.com/' + REPO + '/' + RAMA + '/web/shots/';
+  var VERSION = '{{VERSION}}';
+  var FECHA = '{{FECHA}}';
+  var CAMBIOS = {{CAMBIOS_JSON}};
+  var LINE = ' · Gratis · Licencia MIT';
+  var LOGO = '{{LOGO_DATA}}';
+  /* ===================== */
+
+  var $ = function (s) { return document.querySelector(s); };
+  var $$ = function (s) { return [].slice.call(document.querySelectorAll(s)); };
+  $('#esc').className += ' js';
+
+  /* ---------- Enlaces y capturas ---------- */
+  function dl(file, over) { return over ? over : 'https://github.com/' + REPO + '/releases/latest/download/' + file; }
+  $$('[data-dl="inst"]').forEach(function (a) { a.href = dl(INSTALADOR, URL_INSTALADOR); });
+  $$('[data-dl="port"]').forEach(function (a) { a.href = dl(PORTABLE, URL_PORTABLE); });
+  $$('[data-repo]').forEach(function (a) { a.href = 'https://github.com/' + REPO; });
+  $$('[data-repo-text]').forEach(function (n) { n.textContent = 'github.com/' + REPO; });
+  $$('img[data-shot]').forEach(function (im) { im.src = IMG + im.getAttribute('data-shot') + '.webp'; });
+
+  /* ---------- Versión y novedades ---------- */
+  var MESES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+  function fechaLarga(iso) {
+    var d = new Date(iso);
+    if (isNaN(d.getTime())) return '';
+    return d.getUTCDate() + ' de ' + MESES[d.getUTCMonth()] + ' de ' + d.getUTCFullYear();
+  }
+  function cmp(a, b) {
+    var x = String(a).split('.'), y = String(b).split('.');
+    for (var i = 0; i < 3; i++) {
+      var p = parseInt(x[i] || '0', 10), r = parseInt(y[i] || '0', 10);
+      if (p !== r) return p > r ? 1 : -1;
+    }
+    return 0;
+  }
+  function mb(bytes) { return bytes ? Math.max(1, Math.round(bytes / 1048576)) + ' MB' : ''; }
+  function setAll(sel, txt) { $$(sel).forEach(function (n) { n.textContent = txt; }); }
+  function el(tag, txt, cls) { var n = document.createElement(tag); if (txt) n.textContent = txt; if (cls) n.className = cls; return n; }
+
+  function paintVersion(ver, fecha, sInst, sPort) {
+    setAll('[data-vnum]', ver);
+    $$('[data-ver]').forEach(function (n) { n.textContent = 'Versión ' + ver; });
+    $$('[data-ver-line]').forEach(function (n) { n.textContent = 'Versión ' + ver + LINE; });
+    if (fecha) setAll('[data-fecha-linea]', fecha);
+    setAll('[data-size-inst]', sInst ? '· ' + sInst : '');
+    setAll('[data-size-port]', sPort ? '· ' + sPort : '');
+    setAll('[data-size-inst-txt]', sInst ? 'Pesa unos ' + sInst + '.' : 'Pesa unos pocos MB.');
+  }
+  function paintNews(list, top) {
+    var items = list.filter(function (e) { return cmp(e.version, top) <= 0; });
+    var ul = $('#news-latest'), old = $('#news-old'), btn = $('#moreBtn');
+    ul.innerHTML = ''; old.innerHTML = '';
+    if (!items.length) return;
+    items[0].items.forEach(function (t) { ul.appendChild(el('li', t)); });
+    var rest = items.slice(1);
+    rest.forEach(function (e) {
+      var row = el('div', '', 'row'), h = el('h4', 'Versión ' + e.version);
+      h.appendChild(el('span', e.fecha)); row.appendChild(h);
+      var u = el('ul'); e.items.forEach(function (t) { u.appendChild(el('li', t)); }); row.appendChild(u);
+      old.appendChild(row);
+    });
+    btn.hidden = rest.length === 0;
+  }
+  $('#moreBtn').addEventListener('click', function () {
+    var old = $('#news-old'), abrir = old.hidden;
+    old.hidden = !abrir;
+    this.textContent = abrir ? 'Ocultar versiones anteriores' : 'Ver versiones anteriores';
+  });
+  paintVersion(VERSION, FECHA, '', '');
+  paintNews(CAMBIOS, VERSION);
+
+  function parseChangelog(md) {
+    var out = [], cur = null, lines = md.split(/\r?\n/);
+    for (var i = 0; i < lines.length; i++) {
+      var m = lines[i].match(/^##\s+v?(\d+\.\d+\.\d+)\s*[-\u2013\u2014]?\s*(.*)$/);
+      if (m) { cur = { version: m[1], fecha: m[2].replace(/\s+$/, ''), items: [] }; out.push(cur); continue; }
+      var b = lines[i].match(/^\s*[-*]\s+(.*\S)\s*$/);
+      if (b && cur) cur.items.push(b[1]);
+    }
+    return out;
+  }
+  function pedir(url, tipo, ok) {
+    try {
+      var opts = tipo === 'json' ? { headers: { 'Accept': 'application/vnd.github+json' } } : {};
+      fetch(url, opts).then(function (r) {
+        if (!r.ok) throw new Error(r.status);
+        return tipo === 'json' ? r.json() : r.text();
+      }).then(ok).catch(function () {});
+    } catch (e) {}
+  }
+  function aplicar(d) {
+    if (!d || !d.version) return;
+    paintVersion(d.version, d.fecha || FECHA, d.sInst, d.sPort);
+    if (d.cambios && d.cambios.length) paintNews(d.cambios, d.version);
+  }
+  var KEY = 'asqr_release_v2', cache = null;
+  try { cache = JSON.parse(localStorage.getItem(KEY) || 'null'); } catch (e) {}
+  if (cache && cache.t && (new Date().getTime() - cache.t) < 3600000 && cache.d) {
+    aplicar(cache.d);
+  } else if (window.fetch) {
+    pedir('https://api.github.com/repos/' + REPO + '/releases/latest', 'json', function (rel) {
+      var data = { version: String(rel.tag_name || '').replace(/^v/, ''), fecha: fechaLarga(rel.published_at), sInst: '', sPort: '', cambios: null };
+      (rel.assets || []).forEach(function (a) {
+        if (a.name === INSTALADOR) data.sInst = mb(a.size);
+        if (a.name === PORTABLE) data.sPort = mb(a.size);
+      });
+      aplicar(data);
+      pedir('https://raw.githubusercontent.com/' + REPO + '/' + RAMA + '/CHANGELOG.md', 'text', function (md) {
+        data.cambios = parseChangelog(md);
+        aplicar(data);
+        try { localStorage.setItem(KEY, JSON.stringify({ t: new Date().getTime(), d: data })); } catch (e) {}
+      });
+    });
+  }
+
+  /* ---------- Altura del marco sin saltos ----------
+     El tema encoge el marco un instante para medirlo. Si en ese instante la página de afuera
+     se queda corta, el navegador mueve el scroll y la página salta. Aquí la caja que contiene
+     el marco guarda siempre el alto real, así afuera nada se mueve mientras mide. */
+  var fe = null;
+  try { fe = window.frameElement; } catch (e) {}
+  if (fe) {
+    // Las animaciones de esta página no le avisan al tema: no cambian el alto y solo provocaban mediciones de más.
+    ['transitionend', 'animationend'].forEach(function (t) {
+      document.documentElement.addEventListener(t, function (e) { e.stopPropagation(); });
+    });
+    var held = 0;
+    var hold = function () {
+      var h = Math.ceil(document.body.getBoundingClientRect().height);
+      if (h < 200 || Math.abs(h - held) < 2) return;
+      held = h;
+      try {
+        // La caja del tema aparece al bajar solo si se ve un 20 % de ella; con una página tan alta nunca llega
+        // a ese 20 % y se queda invisible (todo en negro). Por eso se muestra desde aquí.
+        fe.parentNode.classList.add('in');
+        fe.parentNode.style.minHeight = h + 'px';
+        if (Math.abs(fe.offsetHeight - h) > 2) fe.style.height = h + 'px';
+      } catch (e) {}
+    };
+    hold();
+    window.addEventListener('load', hold);
+    if ('ResizeObserver' in window) new ResizeObserver(hold).observe(document.body);
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(hold);
+    $$('details').forEach(function (d) { d.addEventListener('toggle', hold); });
+  }
+
+  // Enlaces internos: bajan dentro del marco del tema.
+  $$('a[href^="#"]').forEach(function (a) {
+    if (a.hasAttribute('data-dl') || a.hasAttribute('data-repo') || a.getAttribute('href') === '#') return;
+    a.addEventListener('click', function (e) {
+      var t = document.querySelector(a.getAttribute('href'));
+      if (!t) return;
+      e.preventDefault();
+      if (fe && window.parent) {
+        window.parent.scrollTo({ top: fe.getBoundingClientRect().top + window.parent.scrollY + t.getBoundingClientRect().top - 80, behavior: 'smooth' });
+      } else {
+        t.scrollIntoView({ behavior: 'smooth' });
+      }
+    });
+  });
+
+  /* ---------- Aparecer al bajar ---------- */
+  var els = $$('.rv');
+  function check() {
+    if (!els.length) return;
+    var offset = 0, vh = window.innerHeight;
+    try { if (fe && window.parent) { offset = -fe.getBoundingClientRect().top; vh = window.parent.innerHeight; } } catch (e) {}
+    els = els.filter(function (el) {
+      var r = el.getBoundingClientRect();
+      if (r.top - offset < vh * 0.9 && r.bottom - offset > 0) { el.classList.add('in'); return false; }
+      return true;
+    });
+  }
+  window.addEventListener('scroll', check, { passive: true });
+  window.addEventListener('resize', check);
+  try { window.parent.addEventListener('scroll', check, { passive: true }); } catch (e) {}
+  setInterval(check, 400);
+  check();
+
+  /* ---------- Generador de QR (todo ocurre en tu navegador) ---------- */
+  var QRP = (function () {
+    var EYE_R = [2.0, 1.2, 0.9];
+    function f(v) { return String(Math.round(v * 1000) / 1000); }
+    function utf8(s) { return unescape(encodeURIComponent(s)); }
+    function lum(hex) {
+      var h = hex.replace('#', ''), c = [0, 2, 4].map(function (i) {
+        var v = parseInt(h.substr(i, 2), 16) / 255;
+        return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4);
+      });
+      return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];
+    }
+    function contrast(a, b) { var x = lum(a), y = lum(b); return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05); }
+    function markColor(fg, bg) { var c = lum(fg) <= lum(bg) ? fg : bg; return lum(c) < 0.4 ? c : '#000000'; }
+    function matrix(text, ecc) {
+      var q = qrcode(0, ecc);
+      q.addData(utf8(text));
+      q.make();
+      var n = q.getModuleCount(), m = [], r, c;
+      for (r = 0; r < n; r++) { m.push([]); for (c = 0; c < n; c++) m[r].push(q.isDark(r, c)); }
+      return m;
+    }
+    function runs(cells, n, vertical) {
+      var out = [], a, b, s;
+      for (a = 0; a < n; a++) {
+        b = 0;
+        while (b < n) {
+          var on = vertical ? cells[b][a] : cells[a][b];
+          if (on) {
+            s = b;
+            while (b < n && (vertical ? cells[b][a] : cells[a][b])) b++;
+            out.push(vertical ? [a, s, 1, b - s] : [s, a, b - s, 1]);
+          } else { b++; }
+        }
+      }
+      return out;
+    }
+    function eye(x, y, shape, color, bg) {
+      if (shape === 'circle') {
+        var cx = f(x + 3.5), cy = f(y + 3.5);
+        return '<circle cx="' + cx + '" cy="' + cy + '" r="3.5" fill="' + color + '"/><circle cx="' + cx + '" cy="' + cy + '" r="2.5" fill="' + bg + '"/><circle cx="' + cx + '" cy="' + cy + '" r="1.5" fill="' + color + '"/>';
+      }
+      var r = shape === 'rounded' ? EYE_R : [0, 0, 0];
+      return '<rect x="' + x + '" y="' + y + '" width="7" height="7" rx="' + r[0] + '" fill="' + color + '"/>' +
+        '<rect x="' + (x + 1) + '" y="' + (y + 1) + '" width="5" height="5" rx="' + r[1] + '" fill="' + bg + '"/>' +
+        '<rect x="' + (x + 2) + '" y="' + (y + 2) + '" width="3" height="3" rx="' + r[2] + '" fill="' + color + '"/>';
+    }
+    /* o: text, shape, eye, fg, bg, eyeColor, logo (true/false), border (cuadritos de margen) */
+    function render(o) {
+      var m = matrix(o.text, o.logo ? 'H' : 'M'), n = m.length, b = o.border == null ? 4 : o.border, total = n + 2 * b;
+      var eyeC = o.eyeColor || o.fg, x, y, i;
+      var cells = [];
+      for (y = 0; y < n; y++) {
+        cells.push([]);
+        for (x = 0; x < n; x++) {
+          var inEye = (x < 7 && y < 7) || (x >= n - 7 && y < 7) || (x < 7 && y >= n - 7);
+          cells[y].push(m[y][x] && !inEye);
+        }
+      }
+      var out = '<rect width="' + total + '" height="' + total + '" fill="' + o.bg + '"/>';
+      if (o.shape === 'square') {
+        var d = '';
+        for (y = 0; y < n; y++) {
+          x = 0;
+          while (x < n) {
+            if (cells[y][x]) { var s = x; while (x < n && cells[y][x]) x++; d += 'M' + (b + s) + ' ' + (b + y) + 'h' + (x - s) + 'v1h-' + (x - s) + 'z'; }
+            else { x++; }
+          }
+        }
+        out += '<path d="' + d + '" fill="' + o.fg + '" shape-rendering="crispEdges"/>';
+      } else {
+        out += '<g fill="' + o.fg + '">';
+        if (o.shape === 'vbars' || o.shape === 'hbars') {
+          var rs = runs(cells, n, o.shape === 'vbars');
+          for (i = 0; i < rs.length; i++) {
+            var r = rs[i];
+            out += o.shape === 'vbars'
+              ? '<rect x="' + f(b + r[0] + 0.09) + '" y="' + (b + r[1]) + '" width="0.82" height="' + r[3] + '" rx="0.41"/>'
+              : '<rect x="' + (b + r[0]) + '" y="' + f(b + r[1] + 0.09) + '" width="' + r[2] + '" height="0.82" rx="0.41"/>';
+          }
+        } else {
+          for (y = 0; y < n; y++) for (x = 0; x < n; x++) if (cells[y][x]) {
+            out += o.shape === 'dots'
+              ? '<circle cx="' + (b + x + 0.5) + '" cy="' + (b + y + 0.5) + '" r="0.45"/>'
+              : '<rect x="' + (b + x) + '" y="' + (b + y) + '" width="1" height="1" rx="0.35"/>';
+          }
+        }
+        out += '</g>';
+      }
+      out += eye(b, b, o.eye, eyeC, o.bg) + eye(b + n - 7, b, o.eye, eyeC, o.bg) + eye(b, b + n - 7, o.eye, eyeC, o.bg);
+      if (o.logo) {
+        var dia = n * 0.22, c0 = total / 2, rr = dia / 2 + dia * 0.1;
+        out += '<circle cx="' + f(c0) + '" cy="' + f(c0) + '" r="' + f(rr) + '" fill="' + markColor(o.fg, o.bg) + '"/>' +
+          '<image x="' + f(c0 - dia / 2) + '" y="' + f(c0 - dia / 2) + '" width="' + f(dia) + '" height="' + f(dia) + '" href="' + LOGO + '" xlink:href="' + LOGO + '"/>';
+      }
+      return { inner: out, total: total };
+    }
+    function svg(o, px) {
+      var r = render(o);
+      return '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="' + px + '" height="' + px + '" viewBox="0 0 ' + r.total + ' ' + r.total + '">' + r.inner + '</svg>';
+    }
+    function png(o, px, cb) {
+      var img = new Image();
+      img.onload = function () {
+        var c = document.createElement('canvas');
+        c.width = px; c.height = px;
+        c.getContext('2d').drawImage(img, 0, 0, px, px);
+        if (c.toBlob) c.toBlob(function (bl) { cb(bl, c); }, 'image/png'); else cb(null, c);
+      };
+      img.onerror = function () { cb(null, null); };
+      img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg(o, px));
+    }
+    return { render: render, svg: svg, png: png, contrast: contrast };
+  })();
+  window.__qrp = QRP;
+
+  /* ---------- Hero: un QR que cambia de estilo ---------- */
+  var ticks = '';
+  for (var i = 0; i < 60; i++) {
+    var a = i / 60 * Math.PI * 2, r1 = 172, r2 = i % 5 ? 180 : 186;
+    ticks += '<line x1="' + (200 + r1 * Math.cos(a)).toFixed(1) + '" y1="' + (200 + r1 * Math.sin(a)).toFixed(1) + '" x2="' + (200 + r2 * Math.cos(a)).toFixed(1) + '" y2="' + (200 + r2 * Math.sin(a)).toFixed(1) + '"/>';
+  }
+  $('#ticks').innerHTML = ticks;
+  var SITE = 'https://anyelo.style';
+  var HERO = [
+    { name: 'REDONDEADOS', o: { shape: 'rounded', eye: 'circle', fg: '#070707', bg: '#FAEDD3', logo: false } },
+    { name: 'CON TU LOGO', o: { shape: 'rounded', eye: 'rounded', fg: '#070707', bg: '#FAEDD3', logo: true } },
+    { name: 'CUADRADOS', o: { shape: 'square', eye: 'square', fg: '#A93226', bg: '#FAEDD3', logo: false } },
+    { name: 'PUNTOS', o: { shape: 'dots', eye: 'circle', fg: '#1B2A6B', bg: '#FAEDD3', logo: false } }
+  ];
+  var hi = 0;
+  function heroPaint() {
+    var h = HERO[hi], o = {}, k;
+    for (k in h.o) o[k] = h.o[k];
+    o.text = SITE; o.border = 1;
+    try {
+      var r = QRP.render(o), node = $('#heroqr');
+      node.setAttribute('viewBox', '0 0 ' + r.total + ' ' + r.total);
+      node.innerHTML = r.inner;
+      $('#heroname').textContent = h.name;
+    } catch (e) {}
+  }
+  heroPaint();
+  var quieto = false;
+  try { quieto = window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) {}
+  if (!quieto) setInterval(function () {
+    var node = $('#heroqr');
+    node.style.opacity = 0;
+    setTimeout(function () { hi = (hi + 1) % HERO.length; heroPaint(); node.style.opacity = 1; }, 320);
+  }, 3600);
+
+  /* ---------- Demo ---------- */
+  var S = { text: SITE, shape: 'rounded', eye: 'circle', fg: '#070707', bg: '#FAEDD3', logo: false };
+  function demoPaint() {
+    var msg = $('#msg'), badge = $('#badge');
+    var text = S.text.replace(/^\s+|\s+$/g, '');
+    if (!text) { msg.textContent = 'Escribe un link para ver su QR.'; msg.className = 'msg show'; return; }
+    try {
+      var o = { text: text, shape: S.shape, eye: S.eye, fg: S.fg, bg: S.bg, logo: S.logo, border: 2 };
+      $('#sticker').innerHTML = QRP.svg(o, 320);
+      msg.className = 'msg';
+      var ok = QRP.contrast(S.fg, S.bg) >= 3;
+      badge.className = 'badge' + (ok ? '' : ' bad');
+      $('#badgetxt').textContent = ok ? 'Contraste bueno' : 'Poco contraste: muchos lectores no lo van a leer';
+    } catch (e) {
+      msg.textContent = 'Ese texto es demasiado largo para esta vista previa.';
+      msg.className = 'msg show';
+    }
+  }
+  function group(id, key, conv) {
+    $$('#' + id + ' [data-v]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        $$('#' + id + ' [data-v]').forEach(function (x) { x.setAttribute('aria-pressed', x === b ? 'true' : 'false'); });
+        S[key] = conv ? conv(b.getAttribute('data-v')) : b.getAttribute('data-v');
+        demoPaint();
+      });
+    });
+  }
+  group('g-shape', 'shape'); group('g-eye', 'eye'); group('g-fg', 'fg'); group('g-bg', 'bg');
+  group('g-logo', 'logo', function (v) { return v === '1'; });
+  $('#lk').addEventListener('input', function () { S.text = this.value; demoPaint(); });
+  demoPaint();
+
+  function nombreArchivo() {
+    var t = S.text.replace(/^\s+|\s+$/g, '').replace(/^https?:\/\//i, '').replace(/[^a-z0-9]+/gi, '-').replace(/^-+|-+$/g, '').toLowerCase();
+    return 'qr-' + (t || 'anyelo-style').slice(0, 40);
+  }
+  function guardar(blob, nombre) {
+    var url = URL.createObjectURL(blob), a = document.createElement('a');
+    a.href = url; a.download = nombre; document.body.appendChild(a); a.click();
+    setTimeout(function () { URL.revokeObjectURL(url); document.body.removeChild(a); }, 1500);
+  }
+  function opts() { return { text: S.text.replace(/^\s+|\s+$/g, ''), shape: S.shape, eye: S.eye, fg: S.fg, bg: S.bg, logo: S.logo, border: 4 }; }
+  $('#saveSvg').addEventListener('click', function () {
+    if (!S.text.replace(/\s/g, '')) return;
+    try { guardar(new Blob([QRP.svg(opts(), 1000)], { type: 'image/svg+xml' }), nombreArchivo() + '.svg'); } catch (e) {}
+  });
+  $('#savePng').addEventListener('click', function () {
+    if (!S.text.replace(/\s/g, '')) return;
+    try { QRP.png(opts(), 1000, function (bl) { if (bl) guardar(bl, nombreArchivo() + '.png'); }); } catch (e) {}
+  });
+
+  /* ---------- Galería ---------- */
+  $$('#tabs [data-tab]').forEach(function (b) {
+    b.addEventListener('click', function () {
+      var name = b.getAttribute('data-tab');
+      $$('#tabs [data-tab]').forEach(function (x) { x.setAttribute('aria-pressed', x === b ? 'true' : 'false'); });
+      $$('#gal .gpanel').forEach(function (p) { p.className = 'gpanel' + (p.getAttribute('data-panel') === name ? ' on' : ''); });
+    });
+  });
+})();
+</script>
+</body>
+</html>
